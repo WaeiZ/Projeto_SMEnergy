@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
-import 'login_page.dart';
+// Certifica-te de que os caminhos abaixo batem certo com a tua estrutura de pastas
+import 'services/config_service.dart';
+import 'pages/login_page.dart';
+import 'pages/dashboard_page.dart';
 
-void main() {
+void main() async {
+  // OBRIGATÓRIO: Garante que as APIs nativas (como SharedPreferences)
+  // são inicializadas antes da App correr.
+  WidgetsFlutterBinding.ensureInitialized();
+
   runApp(const MyApp());
 }
 
@@ -14,54 +21,45 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'SMEnergy',
 
-      // CONFIGURAÇÃO DO TEMA GLOBAL
+      // O teu tema global (mantido exatamente como tinhas)
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Open Sans',
-
-        // Aplicando o Color Scheme baseado no teu design (Dashboard/Alertas)
         colorScheme: ColorScheme(
           brightness: Brightness.light,
-
-          // Azul Forte: Anel do Sensor e Botões Principais
           primary: const Color(0xFF1D7EF8),
           onPrimary: Colors.white,
-
-          // Azul Médio: Gráficos e Barras de Progresso
           secondary: const Color(0xFF3DA5FA),
           onSecondary: Colors.white,
-
-          // Azul Muito Claro: Fundo de Cards de Alerta (Sensor 2/3)
           surface: const Color(0xFFE3F0FE),
-
-          // Cinza: Textos e Ícones Inativos
           onSurface: const Color(0xFF49454F),
-
-          // Laranja/Vermelho: Alertas de Consumo Anómalo
           error: const Color(0xFFDB3918),
           onError: Colors.white,
-
-          // Cor de Contorno: Bordas e Linhas de Divisão
           outline: const Color(0xFF3DA5FA).withOpacity(0.5),
         ),
-
-        // Forçar o fundo da aplicação a ser sempre branco puro
         scaffoldBackgroundColor: Colors.white,
-
-        // Estilização global opcional para facilitar a criação de botões
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1D7EF8),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(25),
-            ),
-          ),
-        ),
       ),
 
-      home: const LoginPage(),
+      // LÓGICA DE ENTRADA DINÂMICA
+      home: FutureBuilder<int>(
+        future: ConfigService.getConfigStatus(),
+        builder: (context, snapshot) {
+          // 1. Enquanto está a ler a memória ( SharedPreferences )
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          // 2. Verifica o resultado da flag (1 = Dashboard, 0 = Login/Setup)
+          // snapshot.data ?? 0 para garantir que se for nulo, vai para o Login
+          if (snapshot.hasData && snapshot.data == 0) {
+            return const DashboardPage();
+          } else {
+            return const LoginPage();
+          }
+        },
+      ),
     );
   }
 }

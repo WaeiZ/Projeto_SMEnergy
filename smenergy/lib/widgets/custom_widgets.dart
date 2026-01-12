@@ -117,6 +117,7 @@ class CustomGradientButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       height: 55,
       decoration: BoxDecoration(
         gradient: gradient,

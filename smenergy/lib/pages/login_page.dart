@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smenergy/Register_Page';
+import 'package:smenergy/pages/add_equipment_page.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class LoginPage extends StatefulWidget {
@@ -84,7 +85,15 @@ class _LoginPageState extends State<LoginPage> {
               CustomGradientButton(
                 text: 'Entrar',
                 gradient: myGradient,
-                onPressed: () {},
+                onPressed: () {
+                  // Esta função faz a transição para a próxima página
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AddEquipmentPage(),
+                    ),
+                  );
+                },
               ),
 
               const SizedBox(height: 35),
