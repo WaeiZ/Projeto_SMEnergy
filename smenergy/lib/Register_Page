@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:smenergy/widgets/custom_widgets.dart'; // Ajusta o caminho se necessário
+import 'package:smenergy/widgets/custom_widgets.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -9,18 +9,57 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  // Estados para controlar a visibilidade das duas passwords
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _nomeController = TextEditingController();
+  final TextEditingController _passController = TextEditingController();
+  final TextEditingController _confirmPassController = TextEditingController();
+
   bool _isObscure = true;
   bool _isObscureConfirm = true;
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _nomeController.dispose();
+    _passController.dispose();
+    _confirmPassController.dispose();
+    super.dispose();
+  }
+
+  void _validarRegisto() {
+    final email = _emailController.text.trim();
+    final nome = _nomeController.text.trim();
+    final pass = _passController.text;
+    final confirmPass = _confirmPassController.text;
+
+    if (email.isEmpty || nome.isEmpty || pass.isEmpty || confirmPass.isEmpty) {
+      _mostrarMensagem("Preencha todos os campos");
+      return;
+    }
+
+    if (pass != confirmPass) {
+      _mostrarMensagem("As passwords não coincidem");
+      return;
+    }
+
+    print('Sucesso: $email');
+  }
+
+  void _mostrarMensagem(String texto) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(texto),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Usamos o gradiente que definiste no teu ficheiro de widgets
     final myGradient = AppGradients.blueLinear;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      // AppBar apenas para o botão de voltar (seta)
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -35,7 +74,6 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // LOGO (Igual ao da Login Page)
               Center(
                 child: Image.asset(
                   'assets/logo.png',
@@ -43,10 +81,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   fit: BoxFit.contain,
                 ),
               ),
-
               const SizedBox(height: 10),
-
-              // TÍTULO "Registo"
               const Text(
                 'Registo',
                 style: TextStyle(
@@ -55,30 +90,24 @@ class _RegisterPageState extends State<RegisterPage> {
                   color: Colors.black,
                 ),
               ),
-
               const SizedBox(height: 25),
-
-              // CAMPO EMAIL
               CustomPopOutInput(
+                controller: _emailController,
                 icon: Icons.mail_outline,
                 hint: 'Email',
                 gradient: myGradient,
               ),
-
               const SizedBox(height: 20),
-
-              // CAMPO NOME
               CustomPopOutInput(
+                controller: _nomeController,
                 icon: Icons.person_outline,
                 hint: 'Nome',
                 gradient: myGradient,
               ),
-
               const SizedBox(height: 20),
-
-              // CAMPO PASSWORD (com ícone de 3 pontos do design)
               CustomPopOutInput(
-                icon: Icons.more_horiz, // Ícone que representa os "..." do print
+                controller: _passController,
+                icon: Icons.more_horiz,
                 hint: 'Password',
                 gradient: myGradient,
                 isPassword: true,
@@ -87,13 +116,11 @@ class _RegisterPageState extends State<RegisterPage> {
                   setState(() => _isObscure = !_isObscure);
                 },
               ),
-
               const SizedBox(height: 20),
-
-              // CAMPO CONFIRMA PASSWORD
               CustomPopOutInput(
+                controller: _confirmPassController,
                 icon: Icons.more_horiz,
-                hint: 'Confirma a tua Password', 
+                hint: 'Confirma a tua Password',
                 gradient: myGradient,
                 isPassword: true,
                 isObscure: _isObscureConfirm,
@@ -101,19 +128,12 @@ class _RegisterPageState extends State<RegisterPage> {
                   setState(() => _isObscureConfirm = !_isObscureConfirm);
                 },
               ),
-
               const SizedBox(height: 40),
-
-              // BOTÃO CRIAR CONTA
               CustomGradientButton(
                 text: 'Criar Conta',
                 gradient: myGradient,
-                onPressed: () {
-                  // Lógica para registar o utilizador
-                  print('A criar conta...');
-                },
+                onPressed: _validarRegisto,
               ),
-              
               const SizedBox(height: 30),
             ],
           ),

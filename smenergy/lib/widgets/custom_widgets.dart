@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
 
-//gradiente botão_inputs
 class AppGradients {
   static const LinearGradient blueLinear = LinearGradient(
     begin: Alignment.bottomCenter,
     end: Alignment.topCenter,
-    colors: [
-      Color(0xFF1D7EF8), // Azul 500
-      Color(0xFF3DA5FA), // Azul 400
-    ],
+    colors: [Color(0xFF1D7EF8), Color(0xFF3DA5FA)],
   );
 }
 
-// --- O INPUT COM BORDA GRADIENTE ---
 class CustomPopOutInput extends StatelessWidget {
+  final TextEditingController? controller;
   final IconData icon;
   final String hint;
   final LinearGradient gradient;
@@ -23,6 +19,7 @@ class CustomPopOutInput extends StatelessWidget {
 
   const CustomPopOutInput({
     super.key,
+    this.controller,
     required this.icon,
     required this.hint,
     required this.gradient,
@@ -38,7 +35,6 @@ class CustomPopOutInput extends StatelessWidget {
       child: Stack(
         alignment: Alignment.centerLeft,
         children: [
-          // BARRA DE INPUT
           Container(
             height: 50.0,
             margin: const EdgeInsets.only(left: 30.0),
@@ -59,16 +55,17 @@ class CustomPopOutInput extends StatelessWidget {
                 ),
               ),
               child: TextFormField(
+                controller: controller,
                 obscureText: isObscure,
                 textAlignVertical: TextAlignVertical.center,
-                style: const TextStyle(height: 1.0),
+                style: const TextStyle(height: 1.0, color: Colors.black87),
                 decoration: InputDecoration(
                   hintText: hint,
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.only(left: 45),
                   suffixIcon: isPassword
                       ? IconButton(
-                          // Reduzimos o padding do botão para ele não "esticar" o campo
                           padding: EdgeInsets.zero,
                           icon: Icon(
                             isObscure
@@ -78,15 +75,11 @@ class CustomPopOutInput extends StatelessWidget {
                           ),
                           onPressed: onToggleVisibility,
                         )
-                      : const SizedBox(
-                          width: 48,
-                        ), // Ocupa o mesmo espaço que o botão do olho
+                      : const SizedBox(width: 48),
                 ),
               ),
             ),
           ),
-
-          // ÍCONE LATERAL (Círculo)
           Container(
             width: 64.0,
             height: 64.0,
@@ -109,7 +102,6 @@ class CustomPopOutInput extends StatelessWidget {
   }
 }
 
-// --- O BOTÃO COM PREENCHIMENTO GRADIENTE ---
 class CustomGradientButton extends StatelessWidget {
   final String text;
   final LinearGradient gradient;
