@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:smenergy/pages/History_page.dart';
+import 'package:smenergy/pages/alert_page.dart';
+import 'package:smenergy/pages/profile_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -384,7 +387,30 @@ class _DashboardPageState extends State<DashboardPage> {
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.black,
         unselectedItemColor: Colors.black54,
-        onTap: (index) => setState(() => _selectedIndex = index),
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HistoryPage()),
+            );
+            return;
+          }
+          if (index == 2) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AlertPage()),
+            );
+            return;
+          }
+          if (index == 3) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfilePage()),
+            );
+            return;
+          }
+          setState(() => _selectedIndex = index);
+        },
         items: [
           _navItem(Icons.grid_view_rounded, 'Dashboard', 0),
           _navItem(Icons.bar_chart_rounded, 'Histórico', 1),

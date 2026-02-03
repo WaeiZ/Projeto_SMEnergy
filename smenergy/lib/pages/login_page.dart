@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:smenergy/Register_Page';
+import 'package:smenergy/pages/register_page.dart';
 import 'package:smenergy/pages/add_equipment_page.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
