@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
-import 'package:smenergy/pages/gamification_page.dart';
-import 'package:smenergy/widgets/pulse_icon.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -80,122 +78,120 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProgressCard() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const GamificationPage()),
-          );
-        },
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF3DA5FA)),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF3DA5FA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Nível:',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF3DA5FA),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(
-                          text: 'Nível:',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF3DA5FA),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const TextSpan(
-                          text: ' Pulse',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.black,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Progresso',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3DA5FA),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          '500/1000',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildProgressBar(value: 0.5),
-                      ),
-                    ],
-                  ),
-                ],
+              const SizedBox(width: 6),
+              const Text(
+                'Pulse',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const Positioned(
-              top: -10,
-              right: -6,
-              child: PulseIcon(size: 56, strokeWidth: 3),
-            ),
-          ],
-        ),
+              const Spacer(),
+              _buildLevelBadge(),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Progresso',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3DA5FA),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  '500/1000',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildProgressBar(value: 0.5),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildProgressBar({required double value}) {
-    final progress = value < 0 ? 0.0 : (value > 1 ? 1.0 : value);
     return Container(
-      height: 18,
+      height: 16,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF3DA5FA), width: 1.5),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Container(color: Colors.white),
-            ),
-            FractionallySizedBox(
-              widthFactor: progress,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3DA5FA),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-            ),
-          ],
+        child: LinearProgressIndicator(
+          value: value,
+          minHeight: 16,
+          backgroundColor: const Color(0xFFE6F2FF),
+          valueColor: const AlwaysStoppedAnimation(Color(0xFF3DA5FA)),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLevelBadge() {
+    return SizedBox(
+      width: 42,
+      height: 42,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF3DA5FA), width: 2),
+            ),
+          ),
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF3DA5FA), width: 2),
+            ),
+          ),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: Color(0xFF3DA5FA),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
       ),
     );
   }
