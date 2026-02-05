@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/profile_page.dart';
+import 'package:smenergy/widgets/custom_widgets.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -36,6 +37,8 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final myGradient = AppGradients.blueLinear;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -56,13 +59,13 @@ class _HistoryPageState extends State<HistoryPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             _buildSensorDropdown(),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             const Text(
               'Selecionar Medida',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -98,10 +101,14 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             _buildBarChart(),
             const SizedBox(height: 24),
-            _buildExportButton(),
+            CustomGradientButton(
+              text: 'Exportar PDF',
+              gradient: myGradient,
+              onPressed: () {},
+            ),
             const SizedBox(height: 24),
           ],
         ),
@@ -120,7 +127,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 value: sensor,
                 child: Text(
                   sensor,
-                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
                 ),
               ),
             )
@@ -144,7 +151,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 value: measure,
                 child: Text(
                   measure,
-                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
                 ),
               ),
             )
@@ -174,7 +181,7 @@ class _HistoryPageState extends State<HistoryPage> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
@@ -190,7 +197,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   child: Text(
                     value,
                     style: const TextStyle(
-                      fontSize: 14,
+                    fontSize: 14,
                       color: Colors.black87,
                       fontWeight: FontWeight.w600,
                     ),
@@ -201,10 +208,10 @@ class _HistoryPageState extends State<HistoryPage> {
             ),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         const Text(
           'DD/MM/YYYY',
-          style: TextStyle(color: Colors.black54, fontSize: 11),
+          style: TextStyle(color: Colors.black54, fontSize: 12),
         ),
       ],
     );
@@ -213,7 +220,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _buildBarChart() {
     return Container(
       height: 230,
-      padding: const EdgeInsets.only(top: 14, left: 6, right: 12, bottom: 8),
+      padding: const EdgeInsets.only(top: 16, left: 8, right: 12, bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -236,7 +243,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   rod.toY.toInt().toString(),
                   const TextStyle(
                     color: Color(0xFF8C9BB5),
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 );
@@ -269,7 +276,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   value.toInt().toString(),
                   style: const TextStyle(
                     color: Color(0xFF8C9BB5),
-                    fontSize: 10,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -287,7 +294,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     _chartLabels[index],
                     style: const TextStyle(
                       color: Color(0xFF8C9BB5),
-                      fontSize: 10,
+                      fontSize: 12,
                     ),
                   );
                 },
@@ -315,53 +322,6 @@ class _HistoryPageState extends State<HistoryPage> {
             borderRadius: BorderRadius.circular(8),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildExportButton() {
-    return Container(
-      height: 52,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1D7EF8), Color(0xFF3DA5FA)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1D7EF8).withOpacity(0.25),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: () {},
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.picture_as_pdf_rounded, color: Colors.white),
-            SizedBox(width: 10),
-            Text(
-              'Exportar PDF',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

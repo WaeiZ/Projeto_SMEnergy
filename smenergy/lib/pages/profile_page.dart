@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
+import 'package:smenergy/pages/equipSett_page.dart';
+import 'package:smenergy/pages/gamification_page.dart';
+import 'package:smenergy/pages/acc_sett_page.dart';
+import 'package:smenergy/widgets/custom_widgets.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -15,6 +19,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final myGradient = AppGradients.blueLinear;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -35,7 +41,7 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Container(
@@ -56,18 +62,40 @@ class _ProfilePageState extends State<ProfilePage> {
                   'Sérgio Dias',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 14,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             _buildProgressCard(),
-            const SizedBox(height: 18),
-            _buildGradientButton('Definições do Equipamento', onTap: () {}),
-            const SizedBox(height: 14),
-            _buildGradientButton('Definições da Conta', onTap: () {}),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
+            CustomGradientButton(
+              text: 'Definições do Equipamento',
+              gradient: myGradient,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EquipSettPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            CustomGradientButton(
+              text: 'Definições da Conta',
+              gradient: myGradient,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AccSettPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
             _buildOutlineButton('Logout', onTap: () {}),
             const SizedBox(height: 24),
           ],
@@ -78,67 +106,82 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProgressCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF3DA5FA)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Nível:',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF3DA5FA),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'Pulse',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              _buildLevelBadge(),
-            ],
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const GamificationPage()),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF3DA5FA)),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Progresso',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3DA5FA),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  '500/1000',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.bold,
+              Row(
+                children: [
+                  const Text(
+                    'Nível:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF3DA5FA),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Pulse',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  _buildLevelBadge(),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildProgressBar(value: 0.5),
+              const SizedBox(height: 8),
+              const Text(
+                'Progresso',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3DA5FA),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      '500/1000',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildProgressBar(value: 0.5),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -196,49 +239,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildGradientButton(String text, {required VoidCallback onTap}) {
-    return Container(
-      height: 48,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1D7EF8), Color(0xFF3DA5FA)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1D7EF8).withOpacity(0.25),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ],
-      ),
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildOutlineButton(String text, {required VoidCallback onTap}) {
     return SizedBox(
-      height: 44,
+      height: 55,
       width: double.infinity,
       child: OutlinedButton(
         onPressed: onTap,
@@ -253,6 +256,7 @@ class _ProfilePageState extends State<ProfilePage> {
           style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
         ),
       ),

@@ -3,7 +3,6 @@ import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/profile_page.dart';
-import 'package:smenergy/widgets/pulse_icon.dart';
 
 class GamificationPage extends StatefulWidget {
   const GamificationPage({super.key});
@@ -41,7 +40,7 @@ class _GamificationPageState extends State<GamificationPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             _buildLevelTimeline(),
             const SizedBox(height: 24),
           ],
@@ -52,18 +51,27 @@ class _GamificationPageState extends State<GamificationPage> {
   }
 
   Widget _buildLevelTimeline() {
+    const double cardHeight = 110;
+    const double cardSpacing = 16;
+    const double dotColumnWidth = 40;
+    const double dotSize = 22;
+    const double lineWidth = 3;
+    const double lineInset = (cardHeight / 2) - (dotSize / 2);
+    const double lineLeft = (dotColumnWidth / 2) - (lineWidth / 2);
+    final totalHeight = (cardHeight * 3) + (cardSpacing * 2);
+
     return SizedBox(
-      height: 360,
+      height: totalHeight,
       child: Stack(
         children: [
           Positioned(
-            left: 16,
-            top: 8,
-            bottom: 8,
+            left: lineLeft,
+            top: lineInset,
+            bottom: lineInset,
             child: Container(
-              width: 3,
+              width: lineWidth,
               decoration: BoxDecoration(
-                color: const Color(0xFFE1E7F0),
+                color: const Color(0xFFD8DCE3),
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -71,31 +79,41 @@ class _GamificationPageState extends State<GamificationPage> {
           Column(
             children: [
               _buildLevelRow(
+                dotColumnWidth: dotColumnWidth,
+                cardHeight: cardHeight,
                 title: 'Pulse',
                 points: '0 Pontos',
                 isActive: true,
-                child: const PulseIcon(size: 52, strokeWidth: 3),
+                child: _buildAssetIcon(
+                  'assets/icons/pulse_icon.png',
+                  fallback: Icons.radio_button_checked,
+                  size: 64,
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: cardSpacing),
               _buildLevelRow(
+                dotColumnWidth: dotColumnWidth,
+                cardHeight: cardHeight,
                 title: 'Volt',
                 points: '1500 Pontos',
                 isActive: false,
-                child: const Icon(
-                  Icons.bolt,
-                  color: Color(0xFF3DA5FA),
-                  size: 46,
+                child: _buildAssetIcon(
+                  'assets/icons/volt_icon.png',
+                  fallback: Icons.bolt,
+                  size: 56,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: cardSpacing),
               _buildLevelRow(
+                dotColumnWidth: dotColumnWidth,
+                cardHeight: cardHeight,
                 title: 'Zeus',
                 points: '3000 Pontos',
                 isActive: false,
-                child: const Icon(
-                  Icons.account_circle,
-                  color: Color(0xFF3DA5FA),
-                  size: 48,
+                child: _buildAssetIcon(
+                  'assets/icons/zeus_icon.png',
+                  fallback: Icons.account_circle,
+                  size: 56,
                 ),
               ),
             ],
@@ -106,6 +124,8 @@ class _GamificationPageState extends State<GamificationPage> {
   }
 
   Widget _buildLevelRow({
+    required double dotColumnWidth,
+    required double cardHeight,
     required String title,
     required String points,
     required bool isActive,
@@ -115,7 +135,7 @@ class _GamificationPageState extends State<GamificationPage> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
-          width: 32,
+          width: dotColumnWidth,
           child: Align(
             alignment: Alignment.center,
             child: _buildTimelineDot(isActive: isActive),
@@ -123,12 +143,12 @@ class _GamificationPageState extends State<GamificationPage> {
         ),
         Expanded(
           child: Container(
-            height: 96,
+            height: cardHeight,
             padding: const EdgeInsets.symmetric(horizontal: 18),
             decoration: BoxDecoration(
               color: isActive ? const Color(0xFFE6F2FF) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF3DA5FA)),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFF3DA5FA), width: 1.5),
             ),
             child: Row(
               children: [
@@ -137,7 +157,7 @@ class _GamificationPageState extends State<GamificationPage> {
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
                         title,
@@ -145,6 +165,7 @@ class _GamificationPageState extends State<GamificationPage> {
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -153,6 +174,7 @@ class _GamificationPageState extends State<GamificationPage> {
                           color: Color(0xFF3DA5FA),
                           fontSize: 14,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
@@ -167,13 +189,41 @@ class _GamificationPageState extends State<GamificationPage> {
 
   Widget _buildTimelineDot({required bool isActive}) {
     return Container(
-      width: 20,
-      height: 20,
+      width: 22,
+      height: 22,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isActive ? const Color(0xFF3DA5FA) : Colors.white,
+        color: Colors.white,
         border: Border.all(color: const Color(0xFF3DA5FA), width: 2),
       ),
+      child: isActive
+          ? Center(
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF3DA5FA),
+                ),
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildAssetIcon(String asset, {required IconData fallback, double size = 54}) {
+    return Image.asset(
+      asset,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return Icon(
+          fallback,
+          color: const Color(0xFF3DA5FA),
+          size: size,
+        );
+      },
     );
   }
 

@@ -35,22 +35,22 @@ class _AlertPageState extends State<AlertPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             const Text(
               'Alertas Ativos',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 14,
                 color: Colors.black87,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _buildActiveAlertCard(),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             const Text(
               'Estado sensores',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 14,
                 color: Colors.black87,
                 fontWeight: FontWeight.w600,
               ),
@@ -83,7 +83,7 @@ class _AlertPageState extends State<AlertPage> {
 
   Widget _buildActiveAlertCard() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFFFE2D8),
         border: Border.all(color: const Color(0xFFFF6B55)),
@@ -92,8 +92,12 @@ class _AlertPageState extends State<AlertPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF6B55)),
-          const SizedBox(width: 10),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Color(0xFFFF6B55),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,22 +106,22 @@ class _AlertPageState extends State<AlertPage> {
                   'Sensor1 : Consumo anómalo',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 12.5,
+                    fontSize: 14,
                     color: Colors.black87,
                   ),
                 ),
-                SizedBox(height: 6),
+                SizedBox(height: 8),
                 Text(
                   'Sensor 1, com consumo acima\n'
                   'do limite estipulado, verifique!',
-                  style: TextStyle(fontSize: 11, color: Colors.black87),
+                  style: TextStyle(fontSize: 12, color: Colors.black87),
                 ),
-                SizedBox(height: 6),
+                SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerRight,
                   child: Text(
                     'Recompensa: 50 Pontos!',
-                    style: TextStyle(fontSize: 10, color: Colors.black87),
+                    style: TextStyle(fontSize: 12, color: Colors.black87),
                   ),
                 ),
               ],
@@ -133,14 +137,15 @@ class _AlertPageState extends State<AlertPage> {
     required String status,
     required bool isAlert,
   }) {
-    final borderColor = isAlert ? const Color(0xFFFF6B55) : const Color(0xFF3DA5FA);
+    final borderColor =
+        isAlert ? const Color(0xFFFF6B55) : const Color(0xFF3DA5FA);
     final backgroundColor =
         isAlert ? const Color(0xFFFFE2D8) : const Color(0xFFE6F2FF);
     final icon = isAlert ? Icons.warning_amber_rounded : Icons.check;
     final iconBg = isAlert ? const Color(0xFFFFD2C6) : const Color(0xFFD7EAFF);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: backgroundColor,
         border: Border.all(color: borderColor),
@@ -149,27 +154,27 @@ class _AlertPageState extends State<AlertPage> {
       child: Row(
         children: [
           Container(
-            width: 28,
-            height: 28,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: iconBg,
               shape: BoxShape.circle,
               border: Border.all(color: borderColor, width: 1.5),
             ),
-            child: Icon(icon, color: borderColor, size: 16),
+            child: Icon(icon, color: borderColor, size: 18),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               title,
               style: const TextStyle(
-                fontSize: 12.5,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border.all(color: borderColor),
@@ -179,7 +184,7 @@ class _AlertPageState extends State<AlertPage> {
               status,
               style: TextStyle(
                 color: borderColor,
-                fontSize: 10,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
             ),
