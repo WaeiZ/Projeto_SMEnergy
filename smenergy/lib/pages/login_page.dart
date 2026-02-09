@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:smenergy/pages/register_page.dart';
 import 'package:smenergy/pages/add_equipment_page.dart';
+import 'package:smenergy/pages/register_page.dart';
+import 'package:smenergy/services/auth_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class LoginPage extends StatefulWidget {
@@ -11,7 +13,104 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final AuthService _authService = AuthService();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passController = TextEditingController();
   bool _isObscure = true;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (_isLoading) return;
+
+    final email = _emailController.text.trim();
+    final pass = _passController.text;
+
+    if (email.isEmpty || pass.isEmpty) {
+      _mostrarMensagem('Preencha email e password');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.signIn(email: email, password: pass);
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AddEquipmentPage(),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      _mostrarMensagem(_mapAuthError(e));
+    } catch (_) {
+      _mostrarMensagem('Erro ao entrar. Tente novamente.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.signInWithGoogle();
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AddEquipmentPage(),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      _mostrarMensagem(_mapAuthError(e));
+    } on StateError catch (e) {
+      if (e.message != 'CANCELLED') {
+        _mostrarMensagem(e.message);
+      }
+    } catch (_) {
+      _mostrarMensagem('Erro ao entrar com Google.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  String _mapAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'Email inválido';
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Email ou password incorretos';
+      case 'user-disabled':
+        return 'Conta desativada';
+      default:
+        return 'Falha no login. Tente novamente.';
+    }
+  }
+
+  void _mostrarMensagem(String texto) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(texto),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +136,7 @@ class _LoginPageState extends State<LoginPage> {
 
               // EMAIL
               CustomPopOutInput(
+                controller: _emailController,
                 icon: Icons.mail_outline,
                 hint: 'Email',
                 gradient: myGradient,
@@ -46,6 +146,7 @@ class _LoginPageState extends State<LoginPage> {
 
               // PASSWORD
               CustomPopOutInput(
+                controller: _passController,
                 icon: Icons.lock_outline,
                 hint: 'Password',
                 gradient: myGradient,
@@ -83,16 +184,10 @@ class _LoginPageState extends State<LoginPage> {
 
               // BOTÃO ENTRAR
               CustomGradientButton(
-                text: 'Entrar',
+                text: _isLoading ? 'A entrar...' : 'Entrar',
                 gradient: myGradient,
                 onPressed: () {
-                  // Esta função faz a transição para a próxima página
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddEquipmentPage(),
-                    ),
-                  );
+                  _login();
                 },
               ),
 
@@ -119,7 +214,7 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(
                 height: 55,
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: _isLoading ? null : _loginWithGoogle,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: Colors.grey[200]!),
                     shape: RoundedRectangleBorder(

@@ -1,4 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:smenergy/pages/add_equipment_page.dart';
+import 'package:smenergy/services/auth_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -9,6 +12,7 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final AuthService _authService = AuthService();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _nomeController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
@@ -16,6 +20,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   bool _isObscure = true;
   bool _isObscureConfirm = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -26,7 +31,9 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  void _validarRegisto() {
+  Future<void> _validarRegisto() async {
+    if (_isLoading) return;
+
     final email = _emailController.text.trim();
     final nome = _nomeController.text.trim();
     final pass = _passController.text;
@@ -42,7 +49,29 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    print('Sucesso: $email');
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.signUp(
+        name: nome,
+        email: email,
+        password: pass,
+      );
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const AddEquipmentPage()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      _mostrarMensagem(_mapAuthError(e));
+    } catch (_) {
+      _mostrarMensagem('Erro ao criar conta. Tente novamente.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _mostrarMensagem(String texto) {
@@ -52,6 +81,19 @@ class _RegisterPageState extends State<RegisterPage> {
         backgroundColor: Colors.redAccent,
       ),
     );
+  }
+
+  String _mapAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'email-already-in-use':
+        return 'Este email já está registado';
+      case 'invalid-email':
+        return 'Email inválido';
+      case 'weak-password':
+        return 'A password é demasiado fraca';
+      default:
+        return 'Falha no registo. Tente novamente.';
+    }
   }
 
   @override
@@ -130,7 +172,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 40),
               CustomGradientButton(
-                text: 'Criar Conta',
+                text: _isLoading ? 'A criar...' : 'Criar Conta',
                 gradient: myGradient,
                 onPressed: _validarRegisto,
               ),

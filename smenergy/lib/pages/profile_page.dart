@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:smenergy/pages/History_page.dart';
+import 'package:smenergy/pages/acc_sett_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/equipSett_page.dart';
 import 'package:smenergy/pages/gamification_page.dart';
-import 'package:smenergy/pages/acc_sett_page.dart';
+import 'package:smenergy/pages/login_page.dart';
+import 'package:smenergy/services/auth_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -16,6 +18,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   int _selectedIndex = 3;
+  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +99,18 @@ class _ProfilePageState extends State<ProfilePage> {
               },
             ),
             const SizedBox(height: 12),
-            _buildOutlineButton('Logout', onTap: () {}),
+            _buildOutlineButton(
+              'Logout',
+              onTap: () async {
+                await _authService.signOut();
+                if (!mounted) return;
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              },
+            ),
             const SizedBox(height: 24),
           ],
         ),

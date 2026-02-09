@@ -1,13 +1,18 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 // Certifica-te de que os caminhos abaixo batem certo com a tua estrutura de pastas
-import 'services/config_service.dart';
-import 'pages/login_page.dart';
+import 'firebase_options.dart';
 import 'pages/dashboard_page.dart';
+import 'pages/login_page.dart';
+import 'services/config_service.dart';
 
 void main() async {
   // OBRIGATÓRIO: Garante que as APIs nativas (como SharedPreferences)
   // são inicializadas antes da App correr.
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   runApp(const MyApp());
 }
