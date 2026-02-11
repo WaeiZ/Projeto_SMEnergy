@@ -21,6 +21,11 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isObscure = true;
   bool _isObscureConfirm = true;
   bool _isLoading = false;
+  final RegExp _hasUpper = RegExp(r'[A-Z]');
+  final RegExp _hasLower = RegExp(r'[a-z]');
+  final RegExp _hasDigit = RegExp(r'\d');
+  final RegExp _hasSpecial =
+      RegExp(r"[!@#$%^&*(),.?{}|<>_\-\\/\[\];'`~+=]");
 
   @override
   void dispose() {
@@ -41,6 +46,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (email.isEmpty || nome.isEmpty || pass.isEmpty || confirmPass.isEmpty) {
       _mostrarMensagem("Preencha todos os campos");
+      return;
+    }
+
+    final passwordError = _validatePassword(pass);
+    if (passwordError != null) {
+      _mostrarMensagem(passwordError);
       return;
     }
 
@@ -81,6 +92,25 @@ class _RegisterPageState extends State<RegisterPage> {
         backgroundColor: Colors.redAccent,
       ),
     );
+  }
+
+  String? _validatePassword(String pass) {
+    if (pass.length < 8) {
+      return 'A password deve ter pelo menos 8 caracteres';
+    }
+    if (!_hasUpper.hasMatch(pass)) {
+      return 'A password deve ter pelo menos 1 letra maiúscula';
+    }
+    if (!_hasLower.hasMatch(pass)) {
+      return 'A password deve ter pelo menos 1 letra minúscula';
+    }
+    if (!_hasDigit.hasMatch(pass)) {
+      return 'A password deve ter pelo menos 1 número';
+    }
+    if (!_hasSpecial.hasMatch(pass)) {
+      return 'A password deve ter pelo menos 1 carácter especial';
+    }
+    return null;
   }
 
   String _mapAuthError(FirebaseAuthException e) {

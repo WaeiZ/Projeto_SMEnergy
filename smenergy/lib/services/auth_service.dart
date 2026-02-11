@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -77,6 +79,207 @@ class AuthService {
     }
 
     return userCredential;
+  }
+
+  Future<void> sendPasswordResetEmail({required String email}) {
+    return _auth.sendPasswordResetEmail(email: email);
+  }
+
+  Future<void> updateUserName({required String name}) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Utilizador não autenticado.');
+    }
+
+    await user.updateDisplayName(name);
+    await _db.collection('users').doc(user.uid).set(
+      {'name': name},
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<void> deleteAccountAndData() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Utilizador não autenticado.');
+    }
+
+    await _deleteUserData(user.uid);
+    await user.delete();
+    await _auth.signOut();
+    await _googleSignIn.signOut();
+  }
+
+  Future<void> _deleteUserData(String uid) async {
+    final userRef = _db.collection('users').doc(uid);
+
+    final devicesSnapshot = await userRef.collection('devices').get();
+    for (final deviceDoc in devicesSnapshot.docs) {
+      final sensorsRef = deviceDoc.reference.collection('sensors');
+      final sensorsSnapshot = await sensorsRef.get();
+      for (final sensorDoc in sensorsSnapshot.docs) {
+        await _deleteCollection(sensorDoc.reference.collection('readings'));
+      }
+      await _deleteCollection(sensorsRef);
+    }
+
+    await _deleteCollection(userRef.collection('devices'));
+    await userRef.delete();
+  }
+
+  Future<void> _deleteCollection(
+    CollectionReference<Map<String, dynamic>> collection, {
+    int batchSize = 100,
+  }) async {
+    while (true) {
+      final snapshot = await collection.limit(batchSize).get();
+      if (snapshot.docs.isEmpty) {
+        break;
+      }
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+  }
+
+  Future<void> enrollPhoneMfa({
+    required String phoneNumber,
+    required Future<String?> Function() getSmsCode,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Utilizador não autenticado.');
+    }
+
+    if (user.email != null && !user.emailVerified) {
+      // Email verification is recommended but not required for SMS MFA enrollment.
+      await user.sendEmailVerification();
+    }
+
+    final session = await user.multiFactor.getSession();
+    final completer = Completer<void>();
+
+    await _auth.verifyPhoneNumber(
+      multiFactorSession: session,
+      phoneNumber: phoneNumber,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        try {
+          await user.multiFactor.enroll(
+            PhoneMultiFactorGenerator.getAssertion(credential),
+          );
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
+        } catch (e) {
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        }
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        if (!completer.isCompleted) {
+          completer.completeError(e);
+        }
+      },
+      codeSent: (String verificationId, int? resendToken) async {
+        final smsCode = await getSmsCode();
+        if (smsCode == null) {
+          if (!completer.isCompleted) {
+            completer.completeError(StateError('CANCELLED'));
+          }
+          return;
+        }
+
+        final credential = PhoneAuthProvider.credential(
+          verificationId: verificationId,
+          smsCode: smsCode,
+        );
+
+        try {
+          await user.multiFactor.enroll(
+            PhoneMultiFactorGenerator.getAssertion(credential),
+          );
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
+        } catch (e) {
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        }
+      },
+      codeAutoRetrievalTimeout: (_) {},
+    );
+
+    await completer.future;
+  }
+
+  Future<UserCredential> resolveSignInWithSmsMfa({
+    required FirebaseAuthMultiFactorException exception,
+    required Future<String?> Function() getSmsCode,
+  }) async {
+    final hint = exception.resolver.hints.first;
+    if (hint is! PhoneMultiFactorInfo) {
+      throw StateError('Segundo fator não suportado.');
+    }
+
+    final completer = Completer<UserCredential>();
+
+    await _auth.verifyPhoneNumber(
+      multiFactorSession: exception.resolver.session,
+      multiFactorInfo: hint,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        try {
+          final result = await exception.resolver.resolveSignIn(
+            PhoneMultiFactorGenerator.getAssertion(credential),
+          );
+          if (!completer.isCompleted) {
+            completer.complete(result);
+          }
+        } catch (e) {
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        }
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        if (!completer.isCompleted) {
+          completer.completeError(e);
+        }
+      },
+      codeSent: (String verificationId, int? resendToken) async {
+        final smsCode = await getSmsCode();
+        if (smsCode == null) {
+          if (!completer.isCompleted) {
+            completer.completeError(StateError('CANCELLED'));
+          }
+          return;
+        }
+
+        final credential = PhoneAuthProvider.credential(
+          verificationId: verificationId,
+          smsCode: smsCode,
+        );
+
+        try {
+          final result = await exception.resolver.resolveSignIn(
+            PhoneMultiFactorGenerator.getAssertion(credential),
+          );
+          if (!completer.isCompleted) {
+            completer.complete(result);
+          }
+        } catch (e) {
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        }
+      },
+      codeAutoRetrievalTimeout: (_) {},
+    );
+
+    return completer.future;
   }
 
   Future<void> signOut() async {

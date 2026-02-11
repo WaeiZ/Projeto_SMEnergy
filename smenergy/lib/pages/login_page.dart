@@ -18,6 +18,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passController = TextEditingController();
   bool _isObscure = true;
   bool _isLoading = false;
+  bool _isResetLoading = false;
 
   @override
   void dispose() {
@@ -48,6 +49,24 @@ class _LoginPageState extends State<LoginPage> {
           builder: (context) => const AddEquipmentPage(),
         ),
       );
+    } on FirebaseAuthMultiFactorException catch (e) {
+      try {
+        await _authService.resolveSignInWithSmsMfa(
+          exception: e,
+          getSmsCode: _promptForSmsCode,
+        );
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const AddEquipmentPage(),
+          ),
+        );
+      } on StateError catch (err) {
+        if (err.message != 'CANCELLED') {
+          _mostrarMensagem(err.message);
+        }
+      }
     } on FirebaseAuthException catch (e) {
       _mostrarMensagem(_mapAuthError(e));
     } catch (_) {
@@ -73,6 +92,24 @@ class _LoginPageState extends State<LoginPage> {
           builder: (context) => const AddEquipmentPage(),
         ),
       );
+    } on FirebaseAuthMultiFactorException catch (e) {
+      try {
+        await _authService.resolveSignInWithSmsMfa(
+          exception: e,
+          getSmsCode: _promptForSmsCode,
+        );
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const AddEquipmentPage(),
+          ),
+        );
+      } on StateError catch (err) {
+        if (err.message != 'CANCELLED') {
+          _mostrarMensagem(err.message);
+        }
+      }
     } on FirebaseAuthException catch (e) {
       _mostrarMensagem(_mapAuthError(e));
     } on StateError catch (e) {
@@ -86,6 +123,77 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _forgotPassword() async {
+    if (_isResetLoading) return;
+
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      _mostrarMensagem('Indica o teu email para recuperar a password');
+      return;
+    }
+
+    setState(() => _isResetLoading = true);
+
+    try {
+      await _authService.sendPasswordResetEmail(email: email);
+      _mostrarMensagem(
+        'Enviámos um email para redefinir a password',
+        isError: false,
+      );
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'invalid-email':
+          _mostrarMensagem('Email inválido');
+          break;
+        case 'user-not-found':
+          _mostrarMensagem('Não existe conta com este email');
+          break;
+        default:
+          _mostrarMensagem('Erro ao enviar email de recuperação');
+      }
+    } catch (_) {
+      _mostrarMensagem('Erro ao enviar email de recuperação');
+    } finally {
+      if (mounted) {
+        setState(() => _isResetLoading = false);
+      }
+    }
+  }
+
+  Future<String?> _promptForSmsCode() async {
+    String currentValue = '';
+    final result = await showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Código SMS'),
+          content: TextField(
+            keyboardType: TextInputType.number,
+            onChanged: (value) => currentValue = value,
+            decoration: const InputDecoration(
+              hintText: 'Ex: 123456',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, null),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                final code = currentValue.trim();
+                Navigator.pop(dialogContext, code.isEmpty ? null : code);
+              },
+              child: const Text('Confirmar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result;
   }
 
   String _mapAuthError(FirebaseAuthException e) {
@@ -103,11 +211,11 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _mostrarMensagem(String texto) {
+  void _mostrarMensagem(String texto, {bool isError = true}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(texto),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
       ),
     );
   }
@@ -163,7 +271,7 @@ class _LoginPageState extends State<LoginPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: _isResetLoading ? null : _forgotPassword,
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(0, 0),
