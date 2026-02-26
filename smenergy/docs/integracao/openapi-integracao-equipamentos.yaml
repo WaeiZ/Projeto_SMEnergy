@@ -1,0 +1,494 @@
+openapi: 3.1.0
+info:
+  title: SMEnergy Integracao de Equipamentos API
+  version: 0.1.0
+  summary: API para ingestao push/pull de telemetria de equipamentos.
+servers:
+  - url: https://api.smenergy.com
+    description: Producao
+  - url: https://sandbox.api.smenergy.com
+    description: Sandbox parceiros
+
+tags:
+  - name: Ingestion
+  - name: Connectors
+  - name: Health
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+paths:
+  /v1/ingestion/events:
+    post:
+      tags: [Ingestion]
+      summary: Ingestao push de um evento de telemetria
+      operationId: ingestEvent
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/Signature"
+        - $ref: "#/components/parameters/SignatureTimestamp"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelemetryEvent"
+      responses:
+        "202":
+          description: Evento aceito para processamento assincrono
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/ingestion/events/batch:
+    post:
+      tags: [Ingestion]
+      summary: Ingestao push de lote de eventos
+      operationId: ingestEventBatch
+      parameters:
+        - $ref: "#/components/parameters/Signature"
+        - $ref: "#/components/parameters/SignatureTimestamp"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    $ref: "#/components/schemas/TelemetryEvent"
+      responses:
+        "202":
+          description: Lote aceito para processamento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionBatchAcceptedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/connectors:
+    get:
+      tags: [Connectors]
+      summary: Lista conectores configurados
+      operationId: listConnectors
+      responses:
+        "200":
+          description: Lista de conectores
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Connector"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Connectors]
+      summary: Cria conector pull para parceiro externo
+      operationId: createConnector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateConnectorRequest"
+      responses:
+        "201":
+          description: Conector criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connector"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /v1/connectors/{connectorId}:
+    patch:
+      tags: [Connectors]
+      summary: Atualiza configuracao do conector
+      operationId: updateConnector
+      parameters:
+        - $ref: "#/components/parameters/ConnectorId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConnectorRequest"
+      responses:
+        "200":
+          description: Conector atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connector"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/connectors/{connectorId}/sync:
+    post:
+      tags: [Connectors]
+      summary: Dispara pull manual do conector
+      operationId: runConnectorSync
+      parameters:
+        - $ref: "#/components/parameters/ConnectorId"
+      responses:
+        "202":
+          description: Sync agendado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [trace_id, status]
+                properties:
+                  trace_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [queued]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/health:
+    get:
+      tags: [Health]
+      summary: Healthcheck da API
+      operationId: healthcheck
+      security: []
+      responses:
+        "200":
+          description: Servico saudavel
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, timestamp_utc]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  timestamp_utc:
+                    type: string
+                    format: date-time
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    ConnectorId:
+      name: connectorId
+      in: path
+      required: true
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Chave opcional para deduplicacao de requisicoes push.
+      schema:
+        type: string
+        maxLength: 128
+    Signature:
+      name: X-Signature
+      in: header
+      required: false
+      description: Assinatura HMAC do payload para parceiros push.
+      schema:
+        type: string
+    SignatureTimestamp:
+      name: X-Timestamp
+      in: header
+      required: false
+      description: Timestamp ISO-8601 usado na assinatura HMAC.
+      schema:
+        type: string
+        format: date-time
+
+  responses:
+    BadRequest:
+      description: Requisicao invalida
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Nao autenticado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Recurso nao encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflito de idempotencia/estado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Limite de requisicoes excedido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Erro interno
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    TelemetryEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - event_id
+        - tenant_id
+        - partner_id
+        - equipment_id
+        - metric
+        - value
+        - unit
+        - timestamp_utc
+      properties:
+        event_id:
+          type: string
+          description: Identificador unico global do evento.
+          maxLength: 128
+          example: evt_01JX8C4SBR9Q0A0J8Q2SY9Q3W7
+        tenant_id:
+          type: string
+          example: tenant_pt_001
+        partner_id:
+          type: string
+          example: partner_acme
+        equipment_id:
+          type: string
+          example: machine_4421
+        sensor_id:
+          type: string
+          nullable: true
+          example: sensor_main
+        metric:
+          type: string
+          description: Nome canonico da metrica.
+          example: power_w
+        value:
+          type: number
+          example: 542.7
+        unit:
+          type: string
+          example: W
+        timestamp_utc:
+          type: string
+          format: date-time
+          example: 2026-02-25T13:45:02Z
+        quality:
+          type: string
+          enum: [good, estimated, bad]
+          default: good
+        metadata:
+          type: object
+          additionalProperties: true
+
+    IngestionAcceptedResponse:
+      type: object
+      required: [trace_id, status, accepted_count, duplicated_count, rejected_count]
+      properties:
+        trace_id:
+          type: string
+        status:
+          type: string
+          enum: [accepted]
+        accepted_count:
+          type: integer
+          minimum: 0
+          example: 1
+        duplicated_count:
+          type: integer
+          minimum: 0
+          example: 0
+        rejected_count:
+          type: integer
+          minimum: 0
+          example: 0
+
+    IngestionBatchAcceptedResponse:
+      type: object
+      required: [trace_id, status, accepted_count, duplicated_count, rejected_count]
+      properties:
+        trace_id:
+          type: string
+        status:
+          type: string
+          enum: [accepted]
+        accepted_count:
+          type: integer
+          minimum: 0
+          example: 980
+        duplicated_count:
+          type: integer
+          minimum: 0
+          example: 20
+        rejected_count:
+          type: integer
+          minimum: 0
+          example: 0
+
+    Connector:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - partner_id
+        - mode
+        - status
+        - pull_interval_seconds
+      properties:
+        id:
+          type: string
+          example: conn_01JX8S22QPMVQ30WRV6Y7X8N01
+        tenant_id:
+          type: string
+          example: tenant_pt_001
+        partner_id:
+          type: string
+          example: partner_acme
+        mode:
+          type: string
+          enum: [pull, push, hybrid]
+          example: hybrid
+        status:
+          type: string
+          enum: [active, paused]
+          example: active
+        pull_interval_seconds:
+          type: integer
+          minimum: 30
+          maximum: 86400
+          example: 60
+        last_cursor:
+          type: string
+          nullable: true
+          description: Cursor usado no ultimo pull bem sucedido.
+        source_api_base_url:
+          type: string
+          format: uri
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateConnectorRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - tenant_id
+        - partner_id
+        - mode
+      properties:
+        tenant_id:
+          type: string
+        partner_id:
+          type: string
+        mode:
+          type: string
+          enum: [pull, push, hybrid]
+        pull_interval_seconds:
+          type: integer
+          minimum: 30
+          maximum: 86400
+          default: 60
+        source_api_base_url:
+          type: string
+          format: uri
+        source_auth:
+          type: object
+          description: Credenciais/segredos do parceiro (armazenar cifrado).
+          additionalProperties: true
+
+    UpdateConnectorRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [active, paused]
+        pull_interval_seconds:
+          type: integer
+          minimum: 30
+          maximum: 86400
+        source_api_base_url:
+          type: string
+          format: uri
+        source_auth:
+          type: object
+          additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      required: [error, message, trace_id]
+      properties:
+        error:
+          type: string
+          example: validation_error
+        message:
+          type: string
+          example: Campo metric e obrigatorio.
+        trace_id:
+          type: string

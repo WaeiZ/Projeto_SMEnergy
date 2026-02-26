@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/profile_page.dart';
+import 'package:smenergy/services/energy_data_service.dart';
 
 class AlertPage extends StatefulWidget {
   const AlertPage({super.key});
@@ -13,75 +14,105 @@ class AlertPage extends StatefulWidget {
 class _AlertPageState extends State<AlertPage> {
   int _selectedIndex = 2;
 
+  final EnergyDataService _energyDataService = EnergyDataService();
+  late final Stream<EnergyAlertData> _alertStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _alertStream = _energyDataService.streamAlertData();
+    _ensureSeedData();
+  }
+
+  Future<void> _ensureSeedData() async {
+    await _energyDataService.seedDemoDataIfEmpty();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Alertas',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
+    return StreamBuilder<EnergyAlertData>(
+      stream: _alertStream,
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? const EnergyAlertData.empty();
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            title: const Text(
+              'Alertas',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+              ),
+            ),
+            centerTitle: false,
           ),
-        ),
-        centerTitle: false,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            const Text(
-              'Alertas Ativos',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
-                fontWeight: FontWeight.w600,
-              ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                const Text(
+                  'Alertas Ativos',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (data.activeAlert != null)
+                  _buildActiveAlertCard(data.activeAlert!)
+                else
+                  _buildNoActiveAlertCard(),
+                const SizedBox(height: 16),
+                const Text(
+                  'Estado sensores',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (data.statuses.isEmpty)
+                  const Text(
+                    'Sem sensores disponíveis na Firebase.',
+                    style: TextStyle(color: Colors.black54),
+                  )
+                else
+                  ...data.statuses.map(
+                    (status) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildSensorStatusCard(
+                        title: status.sensorName,
+                        status: status.statusLabel,
+                        isAlert: status.isAlert,
+                      ),
+                    ),
+                  ),
+                if (snapshot.hasError) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Erro ao carregar alertas da Firebase.',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                  ),
+                ],
+                const SizedBox(height: 24),
+              ],
             ),
-            const SizedBox(height: 12),
-            _buildActiveAlertCard(),
-            const SizedBox(height: 16),
-            const Text(
-              'Estado sensores',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildSensorStatusCard(
-              title: 'Sensor1',
-              status: 'Alerta',
-              isAlert: true,
-            ),
-            const SizedBox(height: 12),
-            _buildSensorStatusCard(
-              title: 'Sensor2',
-              status: 'OK',
-              isAlert: false,
-            ),
-            const SizedBox(height: 12),
-            _buildSensorStatusCard(
-              title: 'Sensor3',
-              status: 'OK',
-              isAlert: false,
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNav(),
+          ),
+          bottomNavigationBar: _buildBottomNav(),
+        );
+      },
     );
   }
 
-  Widget _buildActiveAlertCard() {
+  Widget _buildActiveAlertCard(EnergyActiveAlert alert) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -101,30 +132,56 @@ class _AlertPageState extends State<AlertPage> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Sensor1 : Consumo anómalo',
-                  style: TextStyle(
+                  alert.title,
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                     color: Colors.black87,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  'Sensor 1, com consumo acima\n'
-                  'do limite estipulado, verifique!',
-                  style: TextStyle(fontSize: 12, color: Colors.black87),
+                  alert.description,
+                  style: const TextStyle(fontSize: 12, color: Colors.black87),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerRight,
                   child: Text(
-                    'Recompensa: 50 Pontos!',
-                    style: TextStyle(fontSize: 12, color: Colors.black87),
+                    'Recompensa: ${alert.rewardPoints} Pontos!',
+                    style: const TextStyle(fontSize: 12, color: Colors.black87),
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoActiveAlertCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F2FF),
+        border: Border.all(color: const Color(0xFF3DA5FA)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.check_circle_outline, color: Color(0xFF3DA5FA), size: 20),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Sem alertas ativos no momento.',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: Colors.black87,
+              ),
             ),
           ),
         ],
@@ -137,10 +194,12 @@ class _AlertPageState extends State<AlertPage> {
     required String status,
     required bool isAlert,
   }) {
-    final borderColor =
-        isAlert ? const Color(0xFFFF6B55) : const Color(0xFF3DA5FA);
-    final backgroundColor =
-        isAlert ? const Color(0xFFFFE2D8) : const Color(0xFFE6F2FF);
+    final borderColor = isAlert
+        ? const Color(0xFFFF6B55)
+        : const Color(0xFF3DA5FA);
+    final backgroundColor = isAlert
+        ? const Color(0xFFFFE2D8)
+        : const Color(0xFFE6F2FF);
     final icon = isAlert ? Icons.warning_amber_rounded : Icons.check;
     final iconBg = isAlert ? const Color(0xFFFFD2C6) : const Color(0xFFD7EAFF);
 
@@ -167,10 +226,7 @@ class _AlertPageState extends State<AlertPage> {
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
           Container(
@@ -197,9 +253,9 @@ class _AlertPageState extends State<AlertPage> {
   Widget _buildBottomNav() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE3F0FE),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: const BoxDecoration(
+        color: Color(0xFFE3F0FE),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: BottomNavigationBar(
         elevation: 0,

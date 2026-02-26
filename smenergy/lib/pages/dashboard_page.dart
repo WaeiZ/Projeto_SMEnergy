@@ -1,8 +1,11 @@
-import 'package:flutter/material.dart';
+import 'dart:math';
+
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
 import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/profile_page.dart';
+import 'package:smenergy/services/energy_data_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -13,153 +16,184 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
-
-  final PageController _pageController = PageController();
   int _currentSensorIndex = 0;
 
-  // Lista mock de sensores para teste
-  final List<Map<String, dynamic>> _sensors = [
-    {'name': 'Sensor 1', 'watts': 500, 'progress': 0.7},
-    {'name': 'Sensor 2', 'watts': 320, 'progress': 0.4},
-    {'name': 'Sensor 3', 'watts': 850, 'progress': 0.9},
-  ];
+  final PageController _pageController = PageController();
+  final EnergyDataService _energyDataService = EnergyDataService();
+  late final Stream<EnergyDashboardData> _dashboardStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboardStream = _energyDataService.streamDashboardData();
+    _ensureSeedData();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _ensureSeedData() async {
+    await _energyDataService.seedDemoDataIfEmpty();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Dashboard',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-        ),
-        centerTitle: false,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 10),
+    return StreamBuilder<EnergyDashboardData>(
+      stream: _dashboardStream,
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? const EnergyDashboardData.empty();
+        final sensors = data.sensors;
+        final chartPoints = data.chartPoints;
+        final allOnline =
+            sensors.isNotEmpty && sensors.every((sensor) => sensor.isOnline);
 
-            _buildMainGauge(),
-
-            const SizedBox(height: 30),
-
-            // Gráfico
-            _buildConsumptionChart(),
-
-            const SizedBox(height: 20),
-
-            // Cards de estado
-            Row(
-              children: [
-                _buildInfoCard(
-                  title: 'Total do dia',
-                  value: '45.2 KWh',
-                  icon: Icons.bolt,
-                  color: const Color(0xFFE3F0FE),
-                  iconColor: Colors.blue,
-                ),
-                const SizedBox(width: 15),
-                _buildInfoCard(
-                  title: 'Estado',
-                  value: 'Online',
-                  icon: Icons.devices,
-                  color: const Color(0xFFE3F0FE),
-                  iconColor: Colors.blue,
-                  isStatus: true,
-                ),
-              ],
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            title: const Text(
+              'Dashboard',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 24,
+              ),
             ),
-
-            // O Spacer() ajuda a empurrar o conteúdo para cima se sobrar espaço
-            const Spacer(),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNav(),
-    );
-  }
-
-  Widget _buildMainGauge() {
-    return Column(
-      children: [
-        SizedBox(
-          height: 320, // Aumentado de 260 para 320 para caber o círculo maior
-          child: PageView.builder(
-            controller: _pageController,
-            onPageChanged: (index) {
-              setState(() {
-                _currentSensorIndex = index;
-              });
-            },
-            itemCount: _sensors.length,
-            itemBuilder: (context, index) {
-              final sensor = _sensors[index];
-              return Center(
-                child: Stack(
-                  alignment: Alignment.center,
+            centerTitle: false,
+          ),
+          body: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 10),
+                _buildMainGauge(sensors),
+                const SizedBox(height: 30),
+                _buildConsumptionChart(chartPoints),
+                const SizedBox(height: 20),
+                Row(
                   children: [
-                    // --- ANEL DE PROGRESSO MAIOR ---
-                    SizedBox(
-                      width: 300, // Aumentado de 250 para 300
-                      height: 300, // Aumentado de 250 para 300
-                      child: CircularProgressIndicator(
-                        value: sensor['progress'],
-                        strokeWidth:
-                            15, // Aumentei a espessura para acompanhar o tamanho
-                        backgroundColor: Colors.grey[100],
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF3DA5FA),
-                        ),
-                      ),
+                    _buildInfoCard(
+                      title: 'Total do dia',
+                      value: '${data.totalDayKwh.toStringAsFixed(1)} KWh',
+                      icon: Icons.bolt,
+                      color: const Color(0xFFE3F0FE),
+                      iconColor: Colors.blue,
                     ),
-
-                    // --- TEXTOS INTERNOS ---
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.bolt,
-                          color: Color(0xFF3DA5FA),
-                          size: 50,
-                        ), // Ícone maior
-                        Text(
-                          sensor['name'],
-                          style: const TextStyle(
-                            fontSize: 20,
-                            color: Colors.grey,
-                          ), // Fonte maior
-                        ),
-                        Text(
-                          '${sensor['watts']} W',
-                          style: const TextStyle(
-                            fontSize: 44, // Aumentado de 36 para 44
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 15),
+                    _buildInfoCard(
+                      title: 'Estado',
+                      value: allOnline ? 'Online' : 'Parcial',
+                      icon: Icons.devices,
+                      color: const Color(0xFFE3F0FE),
+                      iconColor: Colors.blue,
+                      isStatus: true,
+                      statusColor: allOnline
+                          ? Colors.greenAccent
+                          : Colors.orangeAccent,
                     ),
                   ],
                 ),
-              );
-            },
+                if (snapshot.hasError) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Erro ao carregar dados da Firebase.',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                  ),
+                ],
+                const Spacer(),
+              ],
+            ),
           ),
+          bottomNavigationBar: _buildBottomNav(),
+        );
+      },
+    );
+  }
+
+  Widget _buildMainGauge(List<EnergySensorSnapshot> sensors) {
+    final selectedIndex = sensors.isEmpty
+        ? 0
+        : min(_currentSensorIndex, sensors.length - 1);
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 320,
+          child: sensors.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Sem leituras na Firebase para este utilizador.',
+                    style: TextStyle(color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              : PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentSensorIndex = index;
+                    });
+                  },
+                  itemCount: sensors.length,
+                  itemBuilder: (context, index) {
+                    final sensor = sensors[index];
+                    return Center(
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 300,
+                            height: 300,
+                            child: CircularProgressIndicator(
+                              value: sensor.progress,
+                              strokeWidth: 15,
+                              backgroundColor: Colors.grey[100],
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF3DA5FA),
+                              ),
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.bolt,
+                                color: Color(0xFF3DA5FA),
+                                size: 50,
+                              ),
+                              Text(
+                                sensor.name,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              Text(
+                                '${sensor.watts.toInt()} W',
+                                style: const TextStyle(
+                                  fontSize: 44,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
         ),
         const SizedBox(height: 15),
-        // Indicador de Pontos
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(
-            _sensors.length,
-            (index) => _buildDot(index == _currentSensorIndex),
+            sensors.length,
+            (index) => _buildDot(index == selectedIndex),
           ),
         ),
       ],
@@ -168,9 +202,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildDot(bool active) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300), // Suaviza a troca do ponto
+      duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.symmetric(horizontal: 4),
-      width: active ? 10 : 6, // Opcional: aumenta o ponto ativo
+      width: active ? 10 : 6,
       height: 6,
       decoration: BoxDecoration(
         color: active ? const Color(0xFF3DA5FA) : Colors.grey[300],
@@ -179,10 +213,18 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Widget do Gráfico de Linha
-  Widget _buildConsumptionChart() {
+  Widget _buildConsumptionChart(List<EnergyChartPoint> chartPoints) {
+    final points = chartPoints
+        .map((point) => FlSpot(point.x, point.y))
+        .toList(growable: false);
+    final spots = points.isEmpty ? const [FlSpot(0, 0), FlSpot(21, 0)] : points;
+    final maxY = max(
+      8.0,
+      spots.map((spot) => spot.y).reduce(max).ceilToDouble() + 1,
+    );
+
     return Container(
-      height: 220, // Altura ligeiramente maior para caberem os textos dos eixos
+      height: 220,
       padding: const EdgeInsets.only(top: 20, right: 20, left: 10, bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -191,7 +233,6 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       child: LineChart(
         LineChartData(
-          // Configuração da grelha (linhas pontilhadas)
           gridData: FlGridData(
             show: true,
             drawVerticalLine: true,
@@ -208,7 +249,6 @@ class _DashboardPageState extends State<DashboardPage> {
               dashArray: [5, 5],
             ),
           ),
-          // Configuração dos Títulos (Eixos)
           titlesData: FlTitlesData(
             show: true,
             rightTitles: const AxisTitles(
@@ -254,9 +294,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         '18:00',
                         style: TextStyle(color: Colors.grey, fontSize: 10),
                       );
-                    case 23:
+                    case 21:
                       return const Text(
-                        'Now',
+                        'Agora',
                         style: TextStyle(
                           color: Color(0xFF3DA5FA),
                           fontWeight: FontWeight.bold,
@@ -272,35 +312,23 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           borderData: FlBorderData(show: false),
           minX: 0,
-          maxX: 24, // 24 horas do dia
+          maxX: 24,
           minY: 0,
-          maxY: 8, // Ajusta conforme o consumo máximo esperado em kW
+          maxY: maxY,
           lineBarsData: [
             LineChartBarData(
-              // Dados Mock: No futuro, estes pontos virão do teu banco de dados
-              spots: [
-                FlSpot(0, 2),
-                FlSpot(3, 1.8),
-                FlSpot(6, 2.2),
-                FlSpot(9, 3.5),
-                FlSpot(12, 4.2),
-                FlSpot(15, 5.0),
-                FlSpot(18, 7.0), // Ponto alto (ex: hora de jantar)
-                FlSpot(20, 4.5), // O gráfico para aqui se forem 20h
-              ],
+              spots: spots,
               isCurved: true,
               color: const Color(0xFF1D7EF8),
               barWidth: 3,
               isStrokeCapRound: true,
-              dotData: const FlDotData(
-                show: false,
-              ), // Remove os pontos na linha
+              dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF1D7EF8).withOpacity(0.3),
-                    const Color(0xFF1D7EF8).withOpacity(0.0),
+                    const Color(0xFF1D7EF8).withValues(alpha: 0.3),
+                    const Color(0xFF1D7EF8).withValues(alpha: 0),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -313,7 +341,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Widget dos Cards Inferiores
   Widget _buildInfoCard({
     required String title,
     required String value,
@@ -321,6 +348,7 @@ class _DashboardPageState extends State<DashboardPage> {
     required Color color,
     required Color iconColor,
     bool isStatus = false,
+    Color statusColor = Colors.greenAccent,
   }) {
     return Expanded(
       child: Container(
@@ -355,8 +383,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.greenAccent,
+                          decoration: BoxDecoration(
+                            color: statusColor,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -372,13 +400,12 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Bottom Navigation Bar
   Widget _buildBottomNav() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE3F0FE),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: const BoxDecoration(
+        color: Color(0xFFE3F0FE),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: BottomNavigationBar(
         elevation: 0,
@@ -422,7 +449,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   BottomNavigationBarItem _navItem(IconData icon, String label, int index) {
-    bool isSelected = _selectedIndex == index;
+    final isSelected = _selectedIndex == index;
     return BottomNavigationBarItem(
       icon: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
