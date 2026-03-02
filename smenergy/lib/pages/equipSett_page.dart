@@ -3,6 +3,7 @@ import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/profile_page.dart';
+import 'package:smenergy/services/energy_data_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class EquipSettPage extends StatefulWidget {
@@ -14,23 +15,106 @@ class EquipSettPage extends StatefulWidget {
 
 class _EquipSettPageState extends State<EquipSettPage> {
   int _selectedIndex = 3;
+  final EnergyDataService _energyDataService = EnergyDataService();
 
-  final TextEditingController _sensor1Name = TextEditingController(text: 'Sensor 1');
-  final TextEditingController _sensor1Limit = TextEditingController();
-  final TextEditingController _sensor2Name = TextEditingController(text: 'Sensor 2');
-  final TextEditingController _sensor2Limit = TextEditingController();
-  final TextEditingController _sensor3Name = TextEditingController(text: 'Sensor 3');
-  final TextEditingController _sensor3Limit = TextEditingController();
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String? _loadError;
+  List<_EditableSensor> _editableSensors = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSensorSettings();
+  }
 
   @override
   void dispose() {
-    _sensor1Name.dispose();
-    _sensor1Limit.dispose();
-    _sensor2Name.dispose();
-    _sensor2Limit.dispose();
-    _sensor3Name.dispose();
-    _sensor3Limit.dispose();
+    _disposeSensorControllers();
     super.dispose();
+  }
+
+  void _disposeSensorControllers() {
+    for (final sensor in _editableSensors) {
+      sensor.dispose();
+    }
+  }
+
+  Future<void> _loadSensorSettings() async {
+    try {
+      await _energyDataService.seedDemoDataIfEmpty();
+      final sensors = await _energyDataService.fetchSensorSettings();
+      if (!mounted) return;
+
+      final editable = sensors
+          .map(
+            (sensor) => _EditableSensor(
+              id: sensor.id,
+              initialName: sensor.name,
+              initialLimitWatts: sensor.limitWatts,
+            ),
+          )
+          .toList(growable: false);
+
+      setState(() {
+        _disposeSensorControllers();
+        _editableSensors = editable;
+        _isLoading = false;
+        _loadError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Não foi possível carregar os sensores da Firebase.';
+      });
+    }
+  }
+
+  Future<void> _saveSensorSettings() async {
+    if (_isSaving || _editableSensors.isEmpty) return;
+
+    final updates = <EnergySensorSettings>[];
+    for (int i = 0; i < _editableSensors.length; i++) {
+      final sensor = _editableSensors[i];
+      final name = sensor.nameController.text.trim();
+      final limitText = sensor.limitController.text.trim().replaceAll(',', '.');
+      final limitWatts = double.tryParse(limitText);
+
+      if (name.isEmpty) {
+        _showSnackBar('Nome inválido no Sensor ${i + 1}.');
+        return;
+      }
+      if (limitWatts == null || limitWatts <= 0) {
+        _showSnackBar('Limite inválido no Sensor ${i + 1}.');
+        return;
+      }
+
+      updates.add(
+        EnergySensorSettings(id: sensor.id, name: name, limitWatts: limitWatts),
+      );
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await _energyDataService.updateSensorSettings(updates);
+      if (!mounted) return;
+      _showSnackBar('Definições de sensores guardadas com sucesso.');
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Falha ao guardar definições na Firebase.');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -56,80 +140,76 @@ class _EquipSettPageState extends State<EquipSettPage> {
         ),
         centerTitle: false,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            const Text(
-              'Sensor 1',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  if (_loadError != null) ...[
+                    Text(
+                      _loadError!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (_editableSensors.isEmpty)
+                    const Text(
+                      'Sem sensores disponíveis para configuração.',
+                      style: TextStyle(color: Colors.black54, fontSize: 14),
+                    )
+                  else
+                    ..._buildSensorInputs(myGradient),
+                  const SizedBox(height: 24),
+                  CustomGradientButton(
+                    text: _isSaving ? 'A guardar...' : 'Confirmar',
+                    gradient: myGradient,
+                    onPressed: _saveSensorSettings,
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            CustomPopOutInput(
-              controller: _sensor1Name,
-              icon: Icons.bolt,
-              hint: 'Sensor 1',
-              gradient: myGradient,
-            ),
-            const SizedBox(height: 12),
-            CustomPopOutInput(
-              controller: _sensor1Limit,
-              icon: Icons.notifications,
-              hint: 'Limite Sensor 1',
-              gradient: myGradient,
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Sensor 2',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            CustomPopOutInput(
-              controller: _sensor2Name,
-              icon: Icons.bolt,
-              hint: 'Sensor 2',
-              gradient: myGradient,
-            ),
-            const SizedBox(height: 12),
-            CustomPopOutInput(
-              controller: _sensor2Limit,
-              icon: Icons.notifications,
-              hint: 'Limite Sensor 2',
-              gradient: myGradient,
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Sensor 3',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            CustomPopOutInput(
-              controller: _sensor3Name,
-              icon: Icons.bolt,
-              hint: 'Sensor 3',
-              gradient: myGradient,
-            ),
-            const SizedBox(height: 12),
-            CustomPopOutInput(
-              controller: _sensor3Limit,
-              icon: Icons.notifications,
-              hint: 'Limite Sensor 3',
-              gradient: myGradient,
-            ),
-            const SizedBox(height: 24),
-            CustomGradientButton(
-              text: 'Confirmar',
-              gradient: myGradient,
-              onPressed: () {},
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
       bottomNavigationBar: _buildBottomNav(),
     );
+  }
+
+  List<Widget> _buildSensorInputs(LinearGradient gradient) {
+    final widgets = <Widget>[];
+    for (int i = 0; i < _editableSensors.length; i++) {
+      final sensor = _editableSensors[i];
+      widgets.add(
+        Text(
+          'Sensor ${i + 1}',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+      );
+      widgets.add(const SizedBox(height: 8));
+      widgets.add(
+        CustomPopOutInput(
+          controller: sensor.nameController,
+          icon: Icons.bolt,
+          hint: 'Nome do sensor',
+          gradient: gradient,
+        ),
+      );
+      widgets.add(const SizedBox(height: 12));
+      widgets.add(
+        CustomPopOutInput(
+          controller: sensor.limitController,
+          icon: Icons.notifications,
+          hint: 'Limite (W)',
+          gradient: gradient,
+        ),
+      );
+      widgets.add(const SizedBox(height: 18));
+    }
+    return widgets;
   }
 
   Widget _buildBottomNav() {
@@ -200,5 +280,25 @@ class _EquipSettPageState extends State<EquipSettPage> {
       ),
       label: label,
     );
+  }
+}
+
+class _EditableSensor {
+  _EditableSensor({
+    required this.id,
+    required String initialName,
+    required double initialLimitWatts,
+  }) : nameController = TextEditingController(text: initialName),
+       limitController = TextEditingController(
+         text: initialLimitWatts.toStringAsFixed(0),
+       );
+
+  final String id;
+  final TextEditingController nameController;
+  final TextEditingController limitController;
+
+  void dispose() {
+    nameController.dispose();
+    limitController.dispose();
   }
 }

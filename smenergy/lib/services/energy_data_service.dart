@@ -57,13 +57,45 @@ class EnergySensorOption {
   final String name;
 }
 
-class EnergyHistoryData {
-  const EnergyHistoryData({required this.labels, required this.values});
+class EnergySensorSettings {
+  const EnergySensorSettings({
+    required this.id,
+    required this.name,
+    required this.limitWatts,
+  });
 
-  const EnergyHistoryData.empty() : labels = const [], values = const [];
+  final String id;
+  final String name;
+  final double limitWatts;
+}
+
+class EnergyHistoryData {
+  const EnergyHistoryData({
+    required this.labels,
+    required this.values,
+    required this.averageWatts,
+    required this.maxWatts,
+    required this.minWatts,
+    required this.totalKwh,
+    required this.sampleCount,
+  });
+
+  const EnergyHistoryData.empty()
+    : labels = const [],
+      values = const [],
+      averageWatts = 0,
+      maxWatts = 0,
+      minWatts = 0,
+      totalKwh = 0,
+      sampleCount = 0;
 
   final List<String> labels;
   final List<double> values;
+  final double averageWatts;
+  final double maxWatts;
+  final double minWatts;
+  final double totalKwh;
+  final int sampleCount;
 }
 
 class EnergySensorStatus {
@@ -348,6 +380,65 @@ class EnergyDataService {
     return sensors;
   }
 
+  Future<List<EnergySensorSettings>> fetchSensorSettings() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      return const [];
+    }
+
+    final deviceRef = await _resolveActiveDeviceRef(uid);
+    if (deviceRef == null) {
+      return const [];
+    }
+
+    final snapshot = await deviceRef.collection('sensors').get();
+    final sensors = snapshot.docs
+        .where(_isDataDocument)
+        .map(
+          (doc) => EnergySensorSettings(
+            id: doc.id,
+            name: _sensorName(doc.data(), fallback: doc.id),
+            limitWatts: _asDouble(
+              doc.data()['limit_watts'] ?? doc.data()['limitWatts'],
+              fallback: 600,
+            ),
+          ),
+        )
+        .toList(growable: false);
+
+    sensors.sort((a, b) => a.name.compareTo(b.name));
+    return sensors;
+  }
+
+  Future<void> updateSensorSettings(List<EnergySensorSettings> updates) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('Utilizador não autenticado.');
+    }
+
+    final deviceRef = await _resolveActiveDeviceRef(uid);
+    if (deviceRef == null) {
+      throw StateError('Dispositivo não encontrado.');
+    }
+
+    final batch = _db.batch();
+    for (final sensor in updates) {
+      final cleanName = sensor.name.trim().isEmpty
+          ? sensor.id
+          : sensor.name.trim();
+      final safeLimit = sensor.limitWatts <= 0 ? 1.0 : sensor.limitWatts;
+      final sensorRef = deviceRef.collection('sensors').doc(sensor.id);
+      batch.set(sensorRef, {
+        'name': cleanName,
+        'sensor_name': cleanName,
+        'limit_watts': safeLimit,
+        'updated_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
+    await batch.commit();
+  }
+
   Future<EnergyHistoryData> fetchHistory({
     required String sensorId,
     required String measure,
@@ -371,6 +462,18 @@ class EnergyDataService {
       start: start,
       end: end,
     );
+
+    final samples = readings
+        .map((reading) => reading.watts)
+        .toList(growable: false);
+    final sampleCount = samples.length;
+    final averageWatts = sampleCount == 0
+        ? 0.0
+        : samples.fold<double>(0, (acc, value) => acc + value) / sampleCount;
+    final maxWatts = sampleCount == 0 ? 0.0 : samples.reduce(max);
+    final minWatts = sampleCount == 0 ? 0.0 : samples.reduce(min);
+    final hoursInRange = max(1.0, end.difference(start).inMinutes / 60);
+    final totalKwh = (averageWatts / 1000) * hoursInRange;
 
     final byDay = <DateTime, List<double>>{};
     for (final reading in readings) {
@@ -405,10 +508,26 @@ class EnergyDataService {
         compactLabels.add(labels.last);
         compactValues.add(values.last);
       }
-      return EnergyHistoryData(labels: compactLabels, values: compactValues);
+      return EnergyHistoryData(
+        labels: compactLabels,
+        values: compactValues,
+        averageWatts: double.parse(averageWatts.toStringAsFixed(1)),
+        maxWatts: double.parse(maxWatts.toStringAsFixed(1)),
+        minWatts: double.parse(minWatts.toStringAsFixed(1)),
+        totalKwh: double.parse(totalKwh.toStringAsFixed(2)),
+        sampleCount: sampleCount,
+      );
     }
 
-    return EnergyHistoryData(labels: labels, values: values);
+    return EnergyHistoryData(
+      labels: labels,
+      values: values,
+      averageWatts: double.parse(averageWatts.toStringAsFixed(1)),
+      maxWatts: double.parse(maxWatts.toStringAsFixed(1)),
+      minWatts: double.parse(minWatts.toStringAsFixed(1)),
+      totalKwh: double.parse(totalKwh.toStringAsFixed(2)),
+      sampleCount: sampleCount,
+    );
   }
 
   Stream<EnergyAlertData> streamAlertData({

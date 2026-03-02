@@ -2,6 +2,9 @@ import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/profile_page.dart';
@@ -30,10 +33,13 @@ class _HistoryPageState extends State<HistoryPage> {
 
   bool _isLoadingSensors = true;
   bool _isLoadingChart = false;
+  bool _isExportingPdf = false;
   String? _loadError;
 
-  List<double> _chartValues = [];
-  List<String> _chartLabels = [];
+  EnergyHistoryData _historyData = const EnergyHistoryData.empty();
+
+  List<double> get _chartValues => _historyData.values;
+  List<String> get _chartLabels => _historyData.labels;
 
   @override
   void initState() {
@@ -67,8 +73,7 @@ class _HistoryPageState extends State<HistoryPage> {
     if (_selectedSensorId == null) {
       if (!mounted) return;
       setState(() {
-        _chartValues = [];
-        _chartLabels = [];
+        _historyData = const EnergyHistoryData.empty();
       });
       return;
     }
@@ -87,15 +92,13 @@ class _HistoryPageState extends State<HistoryPage> {
       );
       if (!mounted) return;
       setState(() {
-        _chartValues = data.values;
-        _chartLabels = data.labels;
+        _historyData = data;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loadError = 'Erro ao ler histórico da Firebase.';
-        _chartValues = [];
-        _chartLabels = [];
+        _historyData = const EnergyHistoryData.empty();
       });
     } finally {
       if (mounted) {
@@ -171,6 +174,8 @@ class _HistoryPageState extends State<HistoryPage> {
                   ),
                   const SizedBox(height: 16),
                   _buildBarChart(),
+                  const SizedBox(height: 16),
+                  _buildAdditionalDataSection(),
                   if (_loadError != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -183,9 +188,9 @@ class _HistoryPageState extends State<HistoryPage> {
                   ],
                   const SizedBox(height: 24),
                   CustomGradientButton(
-                    text: 'Exportar PDF',
+                    text: _isExportingPdf ? 'A exportar...' : 'Exportar PDF',
                     gradient: myGradient,
-                    onPressed: () {},
+                    onPressed: _isExportingPdf ? () {} : _exportPdf,
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -444,6 +449,275 @@ class _HistoryPageState extends State<HistoryPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildAdditionalDataSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE3F0FE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Dados Adicionais',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  label: 'Amostras',
+                  value: _historyData.sampleCount.toString(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildMetricCard(
+                  label: 'Média',
+                  value: '${_historyData.averageWatts.toStringAsFixed(1)} W',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  label: 'Máximo',
+                  value: '${_historyData.maxWatts.toStringAsFixed(1)} W',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildMetricCard(
+                  label: 'Mínimo',
+                  value: '${_historyData.minWatts.toStringAsFixed(1)} W',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildMetricCard(
+            label: 'Consumo estimado',
+            value: '${_historyData.totalKwh.toStringAsFixed(2)} kWh',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricCard({required String label, required String value}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFDCEBFF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF7C8CA8),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportPdf() async {
+    if (_selectedSensorId == null) {
+      _showSnackBar('Selecione um sensor para exportar o histórico.');
+      return;
+    }
+    if (_isExportingPdf) return;
+
+    setState(() => _isExportingPdf = true);
+    try {
+      final sensorName = _selectedSensorName ?? _selectedSensorId!;
+      final now = DateTime.now();
+      final rows = List<List<String>>.generate(
+        _chartLabels.length,
+        (index) => [
+          _chartLabels[index],
+          _chartValues[index].toStringAsFixed(1),
+        ],
+      );
+
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (context) => [
+            pw.Text(
+              'Relatório de Histórico SMEnergy',
+              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Text(
+              'Gerado em ${_formatDate(now)} às ${_formatHourMinute(now)}',
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+            pw.SizedBox(height: 12),
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(6),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Sensor: $sensorName'),
+                  pw.Text('Medida selecionada: $_selectedMeasure'),
+                  pw.Text(
+                    'Intervalo: ${_formatDate(_startDate)} a ${_formatDate(_endDate)}',
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 12),
+            pw.Text(
+              'Resumo',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              children: [
+                _pdfSummaryRow('Amostras', _historyData.sampleCount.toString()),
+                _pdfSummaryRow(
+                  'Média',
+                  '${_historyData.averageWatts.toStringAsFixed(1)} W',
+                ),
+                _pdfSummaryRow(
+                  'Máximo',
+                  '${_historyData.maxWatts.toStringAsFixed(1)} W',
+                ),
+                _pdfSummaryRow(
+                  'Mínimo',
+                  '${_historyData.minWatts.toStringAsFixed(1)} W',
+                ),
+                _pdfSummaryRow(
+                  'Consumo estimado',
+                  '${_historyData.totalKwh.toStringAsFixed(2)} kWh',
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 12),
+            pw.Text(
+              'Dados do gráfico',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 6),
+            if (rows.isEmpty)
+              pw.Text('Sem dados disponíveis para o período selecionado.')
+            else
+              pw.Table.fromTextArray(
+                headers: const ['Data', 'Valor (W)'],
+                data: rows,
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                headerDecoration: pw.BoxDecoration(
+                  color: PdfColor.fromInt(0xFFE3F0FE),
+                ),
+                cellAlignment: pw.Alignment.centerLeft,
+              ),
+          ],
+        ),
+      );
+
+      final bytes = await pdf.save();
+      await Printing.layoutPdf(
+        name: _buildPdfName(sensorName, now),
+        onLayout: (_) async => bytes,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Não foi possível exportar o PDF.');
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingPdf = false);
+      }
+    }
+  }
+
+  pw.TableRow _pdfSummaryRow(String label, String value) {
+    return pw.TableRow(
+      children: [
+        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(label)),
+        pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(value)),
+      ],
+    );
+  }
+
+  String _buildPdfName(String sensorName, DateTime at) {
+    final lower = sensorName.trim().toLowerCase();
+    final buffer = StringBuffer();
+    bool previousUnderscore = false;
+    for (final code in lower.codeUnits) {
+      final isNumber = code >= 48 && code <= 57;
+      final isLowercaseLetter = code >= 97 && code <= 122;
+      if (isNumber || isLowercaseLetter) {
+        buffer.writeCharCode(code);
+        previousUnderscore = false;
+      } else if (!previousUnderscore && buffer.isNotEmpty) {
+        buffer.write('_');
+        previousUnderscore = true;
+      }
+    }
+    String safeSensor = buffer.toString();
+    if (safeSensor.endsWith('_')) {
+      safeSensor = safeSensor.substring(0, safeSensor.length - 1);
+    }
+    final ts =
+        '${at.year}${at.month.toString().padLeft(2, '0')}${at.day.toString().padLeft(2, '0')}_${at.hour.toString().padLeft(2, '0')}${at.minute.toString().padLeft(2, '0')}';
+    return 'historico_${safeSensor.isEmpty ? 'sensor' : safeSensor}_$ts.pdf';
+  }
+
+  String _formatHourMinute(DateTime date) {
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String? get _selectedSensorName {
+    for (final sensor in _sensors) {
+      if (sensor.id == _selectedSensorId) return sensor.name;
+    }
+    return null;
   }
 
   Widget _buildBottomNav() {
