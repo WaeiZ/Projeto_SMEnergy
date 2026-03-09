@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smenergy/pages/History_page.dart';
+import 'package:smenergy/pages/add_equipment_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/profile_page.dart';
@@ -19,6 +20,7 @@ class _EquipSettPageState extends State<EquipSettPage> {
 
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isUnpairing = false;
   String? _loadError;
   List<_EditableSensor> _editableSensors = [];
 
@@ -42,7 +44,6 @@ class _EquipSettPageState extends State<EquipSettPage> {
 
   Future<void> _loadSensorSettings() async {
     try {
-      await _energyDataService.seedDemoDataIfEmpty();
       final sensors = await _energyDataService.fetchSensorSettings();
       if (!mounted) return;
 
@@ -117,6 +118,54 @@ class _EquipSettPageState extends State<EquipSettPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _unpairDevice() async {
+    if (_isUnpairing) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Desemparelhar equipamento'),
+          content: const Text(
+            'Isto vai remover o equipamento desta conta e enviar um reset remoto. Queres continuar?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Desemparelhar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isUnpairing = true);
+    try {
+      await _energyDataService.unpairActiveDeviceAndRequestReset();
+      if (!mounted) return;
+
+      _showSnackBar('Equipamento desemparelhado. Reset enviado.');
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const AddEquipmentPage()),
+        (route) => false,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Falha ao desemparelhar equipamento.');
+    } finally {
+      if (mounted) {
+        setState(() => _isUnpairing = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final myGradient = AppGradients.blueLinear;
@@ -143,6 +192,7 @@ class _EquipSettPageState extends State<EquipSettPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,7 +219,30 @@ class _EquipSettPageState extends State<EquipSettPage> {
                   CustomGradientButton(
                     text: _isSaving ? 'A guardar...' : 'Confirmar',
                     gradient: myGradient,
-                    onPressed: _saveSensorSettings,
+                    onPressed: _isUnpairing ? null : _saveSensorSettings,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: OutlinedButton.icon(
+                      onPressed: (_isSaving || _isUnpairing)
+                          ? null
+                          : _unpairDevice,
+                      icon: const Icon(Icons.link_off_rounded),
+                      label: Text(
+                        _isUnpairing
+                            ? 'A desemparelhar...'
+                            : 'Desemparelhar equipamento',
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 24),
                 ],

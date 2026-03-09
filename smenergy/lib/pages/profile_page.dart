@@ -3,10 +3,12 @@ import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/acc_sett_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
+import 'package:smenergy/pages/electricity_settings_page.dart';
 import 'package:smenergy/pages/equipSett_page.dart';
 import 'package:smenergy/pages/gamification_page.dart';
 import 'package:smenergy/pages/login_page.dart';
 import 'package:smenergy/services/auth_service.dart';
+import 'package:smenergy/services/energy_data_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -19,6 +21,31 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   int _selectedIndex = 3;
   final AuthService _authService = AuthService();
+  final EnergyDataService _energyDataService = EnergyDataService();
+
+  bool _isLoadingElectricity = true;
+  ElectricityCostProfile _electricityProfile =
+      const ElectricityCostProfile.empty();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadElectricityProfile();
+  }
+
+  Future<void> _loadElectricityProfile() async {
+    try {
+      final profile = await _energyDataService.fetchElectricityCostProfile();
+      if (!mounted) return;
+      setState(() {
+        _electricityProfile = profile;
+        _isLoadingElectricity = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingElectricity = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +79,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   height: 62,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF3DA5FA), width: 2),
+                    border: Border.all(
+                      color: const Color(0xFF3DA5FA),
+                      width: 2,
+                    ),
                   ),
                   child: const Icon(
                     Icons.person,
@@ -63,16 +93,31 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(width: 14),
                 const Text(
                   'Sérgio Dias',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             _buildProgressCard(),
             const SizedBox(height: 16),
+            _buildElectricityCard(),
+            const SizedBox(height: 12),
+            CustomGradientButton(
+              text: 'Definições de Eletricidade',
+              gradient: myGradient,
+              onPressed: () async {
+                final updated = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ElectricitySettingsPage(),
+                  ),
+                );
+                if (updated == true) {
+                  _loadElectricityProfile();
+                }
+              },
+            ),
+            const SizedBox(height: 12),
             CustomGradientButton(
               text: 'Definições do Equipamento',
               gradient: myGradient,
@@ -92,9 +137,7 @@ class _ProfilePageState extends State<ProfilePage> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const AccSettPage(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const AccSettPage()),
                 );
               },
             ),
@@ -103,7 +146,7 @@ class _ProfilePageState extends State<ProfilePage> {
               'Logout',
               onTap: () async {
                 await _authService.signOut();
-                if (!mounted) return;
+                if (!context.mounted) return;
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -152,10 +195,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(width: 6),
                   const Text(
                     'Pulse',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),
                   _buildLevelBadge(),
@@ -188,14 +228,114 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildProgressBar(value: 0.5),
-                  ),
+                  Expanded(child: _buildProgressBar(value: 0.5)),
                 ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildElectricityCard() {
+    if (_isLoadingElectricity) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF3DA5FA)),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final profile = _electricityProfile;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF3DA5FA)),
+        color: const Color(0xFFF7FBFF),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Definições de Eletricidade',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF3DA5FA),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (!profile.isConfigured)
+            const Text(
+              'Ainda não configuraste o teu contrato elétrico.',
+              style: TextStyle(fontSize: 13, color: Colors.black87),
+            )
+          else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _buildElectricityMetric(
+                    'Contrato',
+                    profile.contractType.label,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildElectricityMetric(
+                    'Consumo mensal',
+                    '${profile.totalMonthlyConsumptionKwh.toStringAsFixed(1)} kWh',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _buildElectricityMetric(
+              'Custo estimado',
+              '${profile.estimatedCostEur.toStringAsFixed(2)} € / mês',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildElectricityMetric(String label, String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF6C86A2),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black87,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

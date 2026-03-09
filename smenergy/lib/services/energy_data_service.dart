@@ -69,6 +69,165 @@ class EnergySensorSettings {
   final double limitWatts;
 }
 
+enum ElectricityContractType {
+  simple('simple', 'Simples'),
+  biHourly('bi_hourly', 'Bi-horário'),
+  triHourly('tri_hourly', 'Tri-horário');
+
+  const ElectricityContractType(this.storageKey, this.label);
+
+  final String storageKey;
+  final String label;
+
+  static ElectricityContractType fromStorage(String? value) {
+    for (final type in ElectricityContractType.values) {
+      if (type.storageKey == value) {
+        return type;
+      }
+    }
+    return ElectricityContractType.simple;
+  }
+}
+
+class ElectricityCostProfile {
+  const ElectricityCostProfile({
+    required this.contractType,
+    required this.monthlyConsumptionKwh,
+    required this.simpleTariff,
+    required this.peakConsumptionKwh,
+    required this.offPeakConsumptionKwh,
+    required this.superOffPeakConsumptionKwh,
+    required this.peakTariff,
+    required this.offPeakTariff,
+    required this.superOffPeakTariff,
+    required this.peakSchedule,
+    required this.offPeakSchedule,
+    required this.superOffPeakSchedule,
+  });
+
+  const ElectricityCostProfile.empty()
+    : contractType = ElectricityContractType.simple,
+      monthlyConsumptionKwh = 0,
+      simpleTariff = 0,
+      peakConsumptionKwh = 0,
+      offPeakConsumptionKwh = 0,
+      superOffPeakConsumptionKwh = 0,
+      peakTariff = 0,
+      offPeakTariff = 0,
+      superOffPeakTariff = 0,
+      peakSchedule = '',
+      offPeakSchedule = '',
+      superOffPeakSchedule = '';
+
+  final ElectricityContractType contractType;
+  final double monthlyConsumptionKwh;
+  final double simpleTariff;
+  final double peakConsumptionKwh;
+  final double offPeakConsumptionKwh;
+  final double superOffPeakConsumptionKwh;
+  final double peakTariff;
+  final double offPeakTariff;
+  final double superOffPeakTariff;
+  final String peakSchedule;
+  final String offPeakSchedule;
+  final String superOffPeakSchedule;
+
+  double get totalMonthlyConsumptionKwh {
+    switch (contractType) {
+      case ElectricityContractType.simple:
+        return monthlyConsumptionKwh;
+      case ElectricityContractType.biHourly:
+        return peakConsumptionKwh + offPeakConsumptionKwh;
+      case ElectricityContractType.triHourly:
+        return peakConsumptionKwh +
+            offPeakConsumptionKwh +
+            superOffPeakConsumptionKwh;
+    }
+  }
+
+  double get estimatedCostEur {
+    switch (contractType) {
+      case ElectricityContractType.simple:
+        return monthlyConsumptionKwh * simpleTariff;
+      case ElectricityContractType.biHourly:
+        return (peakConsumptionKwh * peakTariff) +
+            (offPeakConsumptionKwh * offPeakTariff);
+      case ElectricityContractType.triHourly:
+        return (peakConsumptionKwh * peakTariff) +
+            (offPeakConsumptionKwh * offPeakTariff) +
+            (superOffPeakConsumptionKwh * superOffPeakTariff);
+    }
+  }
+
+  bool get isConfigured {
+    switch (contractType) {
+      case ElectricityContractType.simple:
+        return monthlyConsumptionKwh > 0 && simpleTariff > 0;
+      case ElectricityContractType.biHourly:
+        return totalMonthlyConsumptionKwh > 0 &&
+            peakTariff > 0 &&
+            offPeakTariff > 0;
+      case ElectricityContractType.triHourly:
+        return totalMonthlyConsumptionKwh > 0 &&
+            peakTariff > 0 &&
+            offPeakTariff > 0 &&
+            superOffPeakTariff > 0;
+    }
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'contract_type': contractType.storageKey,
+      'monthly_consumption_kwh': monthlyConsumptionKwh,
+      'simple_tariff': simpleTariff,
+      'peak_consumption_kwh': peakConsumptionKwh,
+      'off_peak_consumption_kwh': offPeakConsumptionKwh,
+      'super_off_peak_consumption_kwh': superOffPeakConsumptionKwh,
+      'peak_tariff': peakTariff,
+      'off_peak_tariff': offPeakTariff,
+      'super_off_peak_tariff': superOffPeakTariff,
+      'peak_schedule': peakSchedule.trim(),
+      'off_peak_schedule': offPeakSchedule.trim(),
+      'super_off_peak_schedule': superOffPeakSchedule.trim(),
+      'total_consumption_kwh': totalMonthlyConsumptionKwh,
+      'estimated_cost_eur': double.parse(estimatedCostEur.toStringAsFixed(2)),
+    };
+  }
+
+  factory ElectricityCostProfile.fromMap(Map<String, dynamic> data) {
+    return ElectricityCostProfile(
+      contractType: ElectricityContractType.fromStorage(
+        data['contract_type']?.toString(),
+      ),
+      monthlyConsumptionKwh: _readDouble(data['monthly_consumption_kwh']),
+      simpleTariff: _readDouble(data['simple_tariff']),
+      peakConsumptionKwh: _readDouble(data['peak_consumption_kwh']),
+      offPeakConsumptionKwh: _readDouble(data['off_peak_consumption_kwh']),
+      superOffPeakConsumptionKwh: _readDouble(
+        data['super_off_peak_consumption_kwh'],
+      ),
+      peakTariff: _readDouble(data['peak_tariff']),
+      offPeakTariff: _readDouble(data['off_peak_tariff']),
+      superOffPeakTariff: _readDouble(data['super_off_peak_tariff']),
+      peakSchedule: _readString(data['peak_schedule']),
+      offPeakSchedule: _readString(data['off_peak_schedule']),
+      superOffPeakSchedule: _readString(data['super_off_peak_schedule']),
+    );
+  }
+
+  static double _readDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value.replaceAll(',', '.')) ?? 0;
+    }
+    return 0;
+  }
+
+  static String _readString(dynamic value) {
+    return value?.toString().trim() ?? '';
+  }
+}
+
 class EnergyHistoryData {
   const EnergyHistoryData({
     required this.labels,
@@ -78,6 +237,9 @@ class EnergyHistoryData {
     required this.minWatts,
     required this.totalKwh,
     required this.sampleCount,
+    required this.estimatedCostEur,
+    required this.costConfigured,
+    required this.contractLabel,
   });
 
   const EnergyHistoryData.empty()
@@ -87,7 +249,10 @@ class EnergyHistoryData {
       maxWatts = 0,
       minWatts = 0,
       totalKwh = 0,
-      sampleCount = 0;
+      sampleCount = 0,
+      estimatedCostEur = 0,
+      costConfigured = false,
+      contractLabel = '';
 
   final List<String> labels;
   final List<double> values;
@@ -96,6 +261,9 @@ class EnergyHistoryData {
   final double minWatts;
   final double totalKwh;
   final int sampleCount;
+  final double estimatedCostEur;
+  final bool costConfigured;
+  final String contractLabel;
 }
 
 class EnergySensorStatus {
@@ -139,94 +307,6 @@ class EnergyDataService {
   final FirebaseFirestore _db;
 
   static const Duration _defaultPollInterval = Duration(seconds: 15);
-  static const String _demoDeviceId = 'device_demo';
-
-  Future<bool> seedDemoDataIfEmpty() async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) {
-      return false;
-    }
-
-    final deviceRef = await _resolveOrCreateDeviceRef(uid);
-    final sensorsRef = deviceRef.collection('sensors');
-    final sensorsSnapshot = await sensorsRef.get();
-    final hasSensors = sensorsSnapshot.docs.any(_isDataDocument);
-    if (hasSensors) {
-      return false;
-    }
-
-    final now = DateTime.now();
-    final start = now.subtract(const Duration(days: 14));
-    final profiles = const <_DemoSensorProfile>[
-      _DemoSensorProfile(
-        id: 'sensor_1',
-        name: 'Sensor 1',
-        baseWatts: 360,
-        amplitudeWatts: 220,
-        limitWatts: 620,
-      ),
-      _DemoSensorProfile(
-        id: 'sensor_2',
-        name: 'Sensor 2',
-        baseWatts: 280,
-        amplitudeWatts: 160,
-        limitWatts: 520,
-      ),
-      _DemoSensorProfile(
-        id: 'sensor_3',
-        name: 'Sensor 3',
-        baseWatts: 430,
-        amplitudeWatts: 250,
-        limitWatts: 760,
-      ),
-    ];
-
-    WriteBatch batch = _db.batch();
-    int batchOps = 0;
-    Future<void> commitBatch() async {
-      if (batchOps == 0) return;
-      await batch.commit();
-      batch = _db.batch();
-      batchOps = 0;
-    }
-
-    for (int i = 0; i < profiles.length; i++) {
-      final profile = profiles[i];
-      final sensorRef = sensorsRef.doc(profile.id);
-      final lastWatts = _demoWatts(profile, now, i);
-
-      batch.set(sensorRef, {
-        'name': profile.name,
-        'limit_watts': profile.limitWatts,
-        'current_watts': lastWatts,
-        'last_reading_at': Timestamp.fromDate(now),
-        'source': 'demo',
-        'placeholder': false,
-        'created_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      batchOps++;
-
-      DateTime cursor = start;
-      while (!cursor.isAfter(now)) {
-        final watts = _demoWatts(profile, cursor, i);
-        final readingRef = sensorRef.collection('readings').doc();
-        batch.set(readingRef, {
-          'timestamp': Timestamp.fromDate(cursor),
-          'watts': watts,
-          'source': 'demo',
-        });
-        batchOps++;
-
-        if (batchOps >= 450) {
-          await commitBatch();
-        }
-        cursor = cursor.add(const Duration(hours: 2));
-      }
-    }
-
-    await commitBatch();
-    return true;
-  }
 
   Stream<EnergyDashboardData> streamDashboardData({
     Duration interval = _defaultPollInterval,
@@ -380,6 +460,44 @@ class EnergyDataService {
     return sensors;
   }
 
+  Future<ElectricityCostProfile> fetchElectricityCostProfile() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      return const ElectricityCostProfile.empty();
+    }
+
+    final snapshot = await _db.collection('users').doc(uid).get();
+    final data = snapshot.data();
+    if (data == null) {
+      return const ElectricityCostProfile.empty();
+    }
+
+    final raw = data['electricity_profile'];
+    if (raw is Map<String, dynamic>) {
+      return ElectricityCostProfile.fromMap(raw);
+    }
+    if (raw is Map) {
+      return ElectricityCostProfile.fromMap(raw.cast<String, dynamic>());
+    }
+    return const ElectricityCostProfile.empty();
+  }
+
+  Future<void> saveElectricityCostProfile(
+    ElectricityCostProfile profile,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('Utilizador não autenticado.');
+    }
+
+    final data = profile.toMap();
+    data['updated_at'] = FieldValue.serverTimestamp();
+
+    await _db.collection('users').doc(uid).set({
+      'electricity_profile': data,
+    }, SetOptions(merge: true));
+  }
+
   Future<List<EnergySensorSettings>> fetchSensorSettings() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -439,6 +557,26 @@ class EnergyDataService {
     await batch.commit();
   }
 
+  Future<void> unpairActiveDeviceAndRequestReset() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('Utilizador não autenticado.');
+    }
+
+    final deviceRef = await _resolveActiveDeviceRef(uid);
+    if (deviceRef == null) {
+      throw StateError('Dispositivo não encontrado.');
+    }
+
+    await deviceRef.set({
+      'command': 'reset',
+      'placeholder': true,
+      'is_online': false,
+      'unpaired_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   Future<EnergyHistoryData> fetchHistory({
     required String sensorId,
     required String measure,
@@ -462,6 +600,7 @@ class EnergyDataService {
       start: start,
       end: end,
     );
+    final profile = await fetchElectricityCostProfile();
 
     final samples = readings
         .map((reading) => reading.watts)
@@ -472,8 +611,17 @@ class EnergyDataService {
         : samples.fold<double>(0, (acc, value) => acc + value) / sampleCount;
     final maxWatts = sampleCount == 0 ? 0.0 : samples.reduce(max);
     final minWatts = sampleCount == 0 ? 0.0 : samples.reduce(min);
-    final hoursInRange = max(1.0, end.difference(start).inMinutes / 60);
-    final totalKwh = (averageWatts / 1000) * hoursInRange;
+    final tariffBreakdown = _estimateTariffEnergyBreakdown(
+      readings,
+      start: start,
+      end: end,
+      profile: profile,
+    );
+    final totalKwh = tariffBreakdown.totalKwh;
+    final costConfigured = profile.isConfigured;
+    final estimatedCostEur = costConfigured
+        ? _estimateCostFromBreakdown(tariffBreakdown, profile)
+        : 0.0;
 
     final byDay = <DateTime, List<double>>{};
     for (final reading in readings) {
@@ -497,25 +645,23 @@ class EnergyDataService {
     }
 
     if (labels.length > 8) {
-      final step = (labels.length / 8).ceil();
-      final compactLabels = <String>[];
-      final compactValues = <double>[];
-      for (int i = 0; i < labels.length; i += step) {
-        compactLabels.add(labels[i]);
-        compactValues.add(values[i]);
-      }
-      if (compactLabels.last != labels.last) {
-        compactLabels.add(labels.last);
-        compactValues.add(values.last);
-      }
+      final compactData = _aggregateHistoryByBuckets(
+        byDay,
+        start: start,
+        end: endDay,
+        measure: measure,
+      );
       return EnergyHistoryData(
-        labels: compactLabels,
-        values: compactValues,
+        labels: compactData.labels,
+        values: compactData.values,
         averageWatts: double.parse(averageWatts.toStringAsFixed(1)),
         maxWatts: double.parse(maxWatts.toStringAsFixed(1)),
         minWatts: double.parse(minWatts.toStringAsFixed(1)),
         totalKwh: double.parse(totalKwh.toStringAsFixed(2)),
         sampleCount: sampleCount,
+        estimatedCostEur: double.parse(estimatedCostEur.toStringAsFixed(2)),
+        costConfigured: costConfigured,
+        contractLabel: profile.contractType.label,
       );
     }
 
@@ -527,6 +673,9 @@ class EnergyDataService {
       minWatts: double.parse(minWatts.toStringAsFixed(1)),
       totalKwh: double.parse(totalKwh.toStringAsFixed(2)),
       sampleCount: sampleCount,
+      estimatedCostEur: double.parse(estimatedCostEur.toStringAsFixed(2)),
+      costConfigured: costConfigured,
+      contractLabel: profile.contractType.label,
     );
   }
 
@@ -536,6 +685,59 @@ class EnergyDataService {
     await for (final dashboard in streamDashboardData(interval: interval)) {
       yield _buildAlertData(dashboard.sensors);
     }
+  }
+
+  _HistorySeriesData _aggregateHistoryByBuckets(
+    Map<DateTime, List<double>> byDay, {
+    required DateTime start,
+    required DateTime end,
+    required String measure,
+    int maxPoints = 7,
+  }) {
+    final totalDays = end.difference(start).inDays + 1;
+    final bucketSize = max(1, (totalDays / maxPoints).ceil());
+    final labels = <String>[];
+    final values = <double>[];
+
+    DateTime bucketStart = start;
+    while (!bucketStart.isAfter(end)) {
+      final bucketEndCandidate = bucketStart.add(
+        Duration(days: bucketSize - 1),
+      );
+      final bucketEnd = bucketEndCandidate.isAfter(end)
+          ? end
+          : bucketEndCandidate;
+
+      final bucketSamples = <double>[];
+      DateTime day = bucketStart;
+      while (!day.isAfter(bucketEnd)) {
+        bucketSamples.addAll(byDay[day] ?? const <double>[]);
+        day = day.add(const Duration(days: 1));
+      }
+
+      labels.add(_formatBucketLabel(bucketStart, bucketEnd));
+      values.add(_applyMeasure(bucketSamples, measure));
+      bucketStart = bucketEnd.add(const Duration(days: 1));
+    }
+
+    return _HistorySeriesData(labels: labels, values: values);
+  }
+
+  String _formatBucketLabel(DateTime start, DateTime end) {
+    if (start.year == end.year &&
+        start.month == end.month &&
+        start.day == end.day) {
+      return _formatDayLabel(start);
+    }
+
+    if (start.year == end.year && start.month == end.month) {
+      final startDay = start.day.toString().padLeft(2, '0');
+      final endDay = end.day.toString().padLeft(2, '0');
+      final month = start.month.toString().padLeft(2, '0');
+      return '$startDay-$endDay/$month';
+    }
+
+    return '${_formatDayLabel(start)}-${_formatDayLabel(end)}';
   }
 
   EnergyAlertData _buildAlertData(List<EnergySensorSnapshot> sensors) {
@@ -584,28 +786,6 @@ class EnergyDataService {
       }
     }
     return null;
-  }
-
-  Future<DocumentReference<Map<String, dynamic>>> _resolveOrCreateDeviceRef(
-    String uid,
-  ) async {
-    final existing = await _resolveActiveDeviceRef(uid);
-    if (existing != null) {
-      return existing;
-    }
-
-    final deviceRef = _db
-        .collection('users')
-        .doc(uid)
-        .collection('devices')
-        .doc(_demoDeviceId);
-    await deviceRef.set({
-      'name': 'SMEnergy Demo',
-      'source': 'demo',
-      'placeholder': false,
-      'created_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-    return deviceRef;
   }
 
   bool _isDataDocument(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -712,6 +892,225 @@ class EnergyDataService {
     }
   }
 
+  _TariffEnergyBreakdown _estimateTariffEnergyBreakdown(
+    List<_ReadingSample> readings, {
+    required DateTime start,
+    required DateTime end,
+    required ElectricityCostProfile profile,
+  }) {
+    if (readings.isEmpty || !end.isAfter(start)) {
+      return const _TariffEnergyBreakdown();
+    }
+
+    switch (profile.contractType) {
+      case ElectricityContractType.simple:
+        return _TariffEnergyBreakdown(
+          offPeakKwh: _estimateEnergyKwh(readings, start: start, end: end),
+        );
+      case ElectricityContractType.biHourly:
+        final peakWindows = _parseTimeWindows(profile.peakSchedule);
+        final offPeakWindows = _parseTimeWindows(profile.offPeakSchedule);
+        if (peakWindows.isEmpty && offPeakWindows.isEmpty) {
+          return _estimateBreakdownFromConfiguredRatios(
+            totalKwh: _estimateEnergyKwh(readings, start: start, end: end),
+            peakKwh: profile.peakConsumptionKwh,
+            offPeakKwh: profile.offPeakConsumptionKwh,
+          );
+        }
+        return _estimateBreakdownFromSegments(
+          readings,
+          start: start,
+          end: end,
+          classify: (timestamp) {
+            if (_matchesAnyWindow(timestamp, peakWindows)) {
+              return _TariffPeriod.peak;
+            }
+            if (_matchesAnyWindow(timestamp, offPeakWindows)) {
+              return _TariffPeriod.offPeak;
+            }
+            return _TariffPeriod.offPeak;
+          },
+        );
+      case ElectricityContractType.triHourly:
+        final peakWindows = _parseTimeWindows(profile.peakSchedule);
+        final offPeakWindows = _parseTimeWindows(profile.offPeakSchedule);
+        final superOffPeakWindows = _parseTimeWindows(
+          profile.superOffPeakSchedule,
+        );
+        if (peakWindows.isEmpty &&
+            offPeakWindows.isEmpty &&
+            superOffPeakWindows.isEmpty) {
+          return _estimateBreakdownFromConfiguredRatios(
+            totalKwh: _estimateEnergyKwh(readings, start: start, end: end),
+            peakKwh: profile.peakConsumptionKwh,
+            offPeakKwh: profile.offPeakConsumptionKwh,
+            superOffPeakKwh: profile.superOffPeakConsumptionKwh,
+          );
+        }
+        return _estimateBreakdownFromSegments(
+          readings,
+          start: start,
+          end: end,
+          classify: (timestamp) {
+            if (_matchesAnyWindow(timestamp, peakWindows)) {
+              return _TariffPeriod.peak;
+            }
+            if (_matchesAnyWindow(timestamp, superOffPeakWindows)) {
+              return _TariffPeriod.superOffPeak;
+            }
+            if (_matchesAnyWindow(timestamp, offPeakWindows)) {
+              return _TariffPeriod.offPeak;
+            }
+            return _TariffPeriod.offPeak;
+          },
+        );
+    }
+  }
+
+  _TariffEnergyBreakdown _estimateBreakdownFromConfiguredRatios({
+    required double totalKwh,
+    required double peakKwh,
+    required double offPeakKwh,
+    double superOffPeakKwh = 0,
+  }) {
+    final configuredTotal = peakKwh + offPeakKwh + superOffPeakKwh;
+    if (configuredTotal <= 0) {
+      return _TariffEnergyBreakdown(offPeakKwh: totalKwh);
+    }
+
+    return _TariffEnergyBreakdown(
+      peakKwh: totalKwh * (peakKwh / configuredTotal),
+      offPeakKwh: totalKwh * (offPeakKwh / configuredTotal),
+      superOffPeakKwh: totalKwh * (superOffPeakKwh / configuredTotal),
+    );
+  }
+
+  _TariffEnergyBreakdown _estimateBreakdownFromSegments(
+    List<_ReadingSample> readings, {
+    required DateTime start,
+    required DateTime end,
+    required _TariffPeriod Function(DateTime timestamp) classify,
+  }) {
+    if (readings.isEmpty || !end.isAfter(start)) {
+      return const _TariffEnergyBreakdown();
+    }
+
+    double peakKwh = 0;
+    double offPeakKwh = 0;
+    double superOffPeakKwh = 0;
+
+    for (int i = 0; i < readings.length; i++) {
+      final current = readings[i];
+      final segmentStart = i == 0 ? start : readings[i].timestamp;
+      final rawSegmentEnd = i + 1 < readings.length
+          ? readings[i + 1].timestamp
+          : end;
+      final segmentEnd = rawSegmentEnd.isAfter(end) ? end : rawSegmentEnd;
+      if (!segmentEnd.isAfter(segmentStart)) continue;
+
+      final hours = segmentEnd.difference(segmentStart).inMinutes / 60;
+      final kwh = (current.watts / 1000) * hours;
+      switch (classify(current.timestamp)) {
+        case _TariffPeriod.peak:
+          peakKwh += kwh;
+          break;
+        case _TariffPeriod.offPeak:
+          offPeakKwh += kwh;
+          break;
+        case _TariffPeriod.superOffPeak:
+          superOffPeakKwh += kwh;
+          break;
+      }
+    }
+
+    return _TariffEnergyBreakdown(
+      peakKwh: peakKwh,
+      offPeakKwh: offPeakKwh,
+      superOffPeakKwh: superOffPeakKwh,
+    );
+  }
+
+  double _estimateEnergyKwh(
+    List<_ReadingSample> readings, {
+    required DateTime start,
+    required DateTime end,
+  }) {
+    return _estimateBreakdownFromSegments(
+      readings,
+      start: start,
+      end: end,
+      classify: (_) => _TariffPeriod.offPeak,
+    ).totalKwh;
+  }
+
+  double _estimateCostFromBreakdown(
+    _TariffEnergyBreakdown breakdown,
+    ElectricityCostProfile profile,
+  ) {
+    switch (profile.contractType) {
+      case ElectricityContractType.simple:
+        return breakdown.totalKwh * profile.simpleTariff;
+      case ElectricityContractType.biHourly:
+        return (breakdown.peakKwh * profile.peakTariff) +
+            (breakdown.offPeakKwh * profile.offPeakTariff);
+      case ElectricityContractType.triHourly:
+        return (breakdown.peakKwh * profile.peakTariff) +
+            (breakdown.offPeakKwh * profile.offPeakTariff) +
+            (breakdown.superOffPeakKwh * profile.superOffPeakTariff);
+    }
+  }
+
+  List<_TimeWindow> _parseTimeWindows(String schedule) {
+    final normalized = schedule.replaceAll(';', ',');
+    final parts = normalized
+        .split(',')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty);
+
+    final windows = <_TimeWindow>[];
+    for (final part in parts) {
+      final separatorIndex = part.indexOf('-');
+      if (separatorIndex <= 0 || separatorIndex >= part.length - 1) {
+        continue;
+      }
+
+      final startMinutes = _parseClockToMinutes(
+        part.substring(0, separatorIndex).trim(),
+      );
+      final endMinutes = _parseClockToMinutes(
+        part.substring(separatorIndex + 1).trim(),
+      );
+      if (startMinutes == null || endMinutes == null) {
+        continue;
+      }
+
+      windows.add(
+        _TimeWindow(startMinutes: startMinutes, endMinutes: endMinutes),
+      );
+    }
+    return windows;
+  }
+
+  int? _parseClockToMinutes(String value) {
+    final parts = value.split(':');
+    if (parts.length != 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return (hour * 60) + minute;
+  }
+
+  bool _matchesAnyWindow(DateTime timestamp, List<_TimeWindow> windows) {
+    final minutes = (timestamp.hour * 60) + timestamp.minute;
+    for (final window in windows) {
+      if (window.contains(minutes)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   String _formatDayLabel(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
@@ -735,37 +1134,6 @@ class EnergyDataService {
     }
     return null;
   }
-
-  double _demoWatts(_DemoSensorProfile profile, DateTime timestamp, int index) {
-    final hourPhase = ((timestamp.hour + timestamp.minute / 60) / 24) * 2 * pi;
-    final dayPhase =
-        (timestamp.difference(DateTime(timestamp.year, 1, 1)).inDays / 365) *
-        2 *
-        pi;
-    final wave = sin(hourPhase + (index * 0.8)) + (0.3 * sin(dayPhase + index));
-    final noise = (((timestamp.hour * 7) + (index * 13)) % 23) - 11;
-    final watts =
-        profile.baseWatts +
-        (profile.amplitudeWatts * (0.6 + wave * 0.4)) +
-        noise;
-    return max(80, watts);
-  }
-}
-
-class _DemoSensorProfile {
-  const _DemoSensorProfile({
-    required this.id,
-    required this.name,
-    required this.baseWatts,
-    required this.amplitudeWatts,
-    required this.limitWatts,
-  });
-
-  final String id;
-  final String name;
-  final double baseWatts;
-  final double amplitudeWatts;
-  final double limitWatts;
 }
 
 class _ReadingSample {
@@ -773,6 +1141,46 @@ class _ReadingSample {
 
   final DateTime timestamp;
   final double watts;
+}
+
+class _HistorySeriesData {
+  const _HistorySeriesData({required this.labels, required this.values});
+
+  final List<String> labels;
+  final List<double> values;
+}
+
+enum _TariffPeriod { peak, offPeak, superOffPeak }
+
+class _TariffEnergyBreakdown {
+  const _TariffEnergyBreakdown({
+    this.peakKwh = 0,
+    this.offPeakKwh = 0,
+    this.superOffPeakKwh = 0,
+  });
+
+  final double peakKwh;
+  final double offPeakKwh;
+  final double superOffPeakKwh;
+
+  double get totalKwh => peakKwh + offPeakKwh + superOffPeakKwh;
+}
+
+class _TimeWindow {
+  const _TimeWindow({required this.startMinutes, required this.endMinutes});
+
+  final int startMinutes;
+  final int endMinutes;
+
+  bool contains(int minutes) {
+    if (startMinutes == endMinutes) {
+      return true;
+    }
+    if (startMinutes < endMinutes) {
+      return minutes >= startMinutes && minutes < endMinutes;
+    }
+    return minutes >= startMinutes || minutes < endMinutes;
+  }
 }
 
 class _BucketAccumulator {

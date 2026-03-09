@@ -9,14 +9,16 @@ class AuthService {
     FirebaseAuth? auth,
     FirebaseFirestore? db,
     GoogleSignIn? googleSignIn,
-  })
-      : _auth = auth ?? FirebaseAuth.instance,
-        _db = db ?? FirebaseFirestore.instance,
-        _googleSignIn = googleSignIn ?? GoogleSignIn();
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _db = db ?? FirebaseFirestore.instance,
+       _googleSignIn = googleSignIn ?? GoogleSignIn();
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
   final GoogleSignIn _googleSignIn;
+  static const Set<String> _hasEquipmentBypassEmails = {
+    'sergiomica14@gmail.com',
+  };
 
   Future<UserCredential> signUp({
     required String name,
@@ -43,10 +45,7 @@ class AuthService {
     required String email,
     required String password,
   }) {
-    return _auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    return _auth.signInWithEmailAndPassword(email: email, password: password);
   }
 
   Future<UserCredential> signInWithGoogle() async {
@@ -72,8 +71,8 @@ class AuthService {
       final name = user.displayName?.trim().isNotEmpty == true
           ? user.displayName!.trim()
           : (googleUser.displayName?.trim().isNotEmpty == true
-              ? googleUser.displayName!.trim()
-              : 'Utilizador');
+                ? googleUser.displayName!.trim()
+                : 'Utilizador');
       final email = user.email ?? googleUser.email;
       await _createUserStructure(uid: user.uid, name: name, email: email);
     }
@@ -92,10 +91,9 @@ class AuthService {
     }
 
     await user.updateDisplayName(name);
-    await _db.collection('users').doc(user.uid).set(
-      {'name': name},
-      SetOptions(merge: true),
-    );
+    await _db.collection('users').doc(user.uid).set({
+      'name': name,
+    }, SetOptions(merge: true));
   }
 
   Future<void> deleteAccountAndData() async {
@@ -287,6 +285,34 @@ class AuthService {
     await _googleSignIn.signOut();
   }
 
+  Future<bool> hasEquipmentForCurrentUser() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    final normalizedEmail = user.email?.trim().toLowerCase();
+    if (normalizedEmail != null &&
+        _hasEquipmentBypassEmails.contains(normalizedEmail)) {
+      return true;
+    }
+
+    final devicesSnapshot = await _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('devices')
+        .get();
+
+    for (final doc in devicesSnapshot.docs) {
+      final data = doc.data();
+      final placeholder = data['placeholder'] == true;
+      if (doc.id != '_meta' && !placeholder) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _createUserStructure({
     required String uid,
     required String name,
@@ -310,18 +336,9 @@ class AuthService {
     final sensorRef = deviceRef.collection('sensors').doc('_meta');
     final readingRef = sensorRef.collection('readings').doc('_meta');
 
-    batch.set(deviceRef, {
-      'created_at': now,
-      'placeholder': true,
-    });
-    batch.set(sensorRef, {
-      'created_at': now,
-      'placeholder': true,
-    });
-    batch.set(readingRef, {
-      'created_at': now,
-      'placeholder': true,
-    });
+    batch.set(deviceRef, {'created_at': now, 'placeholder': true});
+    batch.set(sensorRef, {'created_at': now, 'placeholder': true});
+    batch.set(readingRef, {'created_at': now, 'placeholder': true});
 
     await batch.commit();
   }

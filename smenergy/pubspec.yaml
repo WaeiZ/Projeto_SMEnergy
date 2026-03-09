@@ -40,6 +40,7 @@ dependencies:
   firebase_auth: ^6.1.4
   cloud_firestore: ^6.1.2
   google_sign_in: ^6.2.1
+  http: ^1.5.0
   pdf: ^3.11.3
   printing: ^5.14.2
 

@@ -105,7 +105,7 @@ class CustomPopOutInput extends StatelessWidget {
 class CustomGradientButton extends StatelessWidget {
   final String text;
   final LinearGradient gradient;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const CustomGradientButton({
     super.key,
@@ -124,7 +124,7 @@ class CustomGradientButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: gradient.colors.first.withOpacity(0.3),
+            color: gradient.colors.first.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

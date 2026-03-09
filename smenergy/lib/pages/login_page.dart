@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:smenergy/pages/add_equipment_page.dart';
+import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/register_page.dart';
 import 'package:smenergy/services/auth_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
@@ -43,12 +44,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _authService.signIn(email: email, password: pass);
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const AddEquipmentPage(),
-        ),
-      );
+      await _navigateAfterLogin();
     } on FirebaseAuthMultiFactorException catch (e) {
       try {
         await _authService.resolveSignInWithSmsMfa(
@@ -56,12 +52,7 @@ class _LoginPageState extends State<LoginPage> {
           getSmsCode: _promptForSmsCode,
         );
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const AddEquipmentPage(),
-          ),
-        );
+        await _navigateAfterLogin();
       } on StateError catch (err) {
         if (err.message != 'CANCELLED') {
           _mostrarMensagem(err.message);
@@ -86,12 +77,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _authService.signInWithGoogle();
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const AddEquipmentPage(),
-        ),
-      );
+      await _navigateAfterLogin();
     } on FirebaseAuthMultiFactorException catch (e) {
       try {
         await _authService.resolveSignInWithSmsMfa(
@@ -99,12 +85,7 @@ class _LoginPageState extends State<LoginPage> {
           getSmsCode: _promptForSmsCode,
         );
         if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const AddEquipmentPage(),
-          ),
-        );
+        await _navigateAfterLogin();
       } on StateError catch (err) {
         if (err.message != 'CANCELLED') {
           _mostrarMensagem(err.message);
@@ -123,6 +104,24 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _navigateAfterLogin() async {
+    bool hasEquipment = false;
+    try {
+      hasEquipment = await _authService.hasEquipmentForCurrentUser();
+    } catch (_) {
+      hasEquipment = false;
+    }
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            hasEquipment ? const DashboardPage() : const AddEquipmentPage(),
+      ),
+    );
   }
 
   Future<void> _forgotPassword() async {
@@ -173,9 +172,7 @@ class _LoginPageState extends State<LoginPage> {
           content: TextField(
             keyboardType: TextInputType.number,
             onChanged: (value) => currentValue = value,
-            decoration: const InputDecoration(
-              hintText: 'Ex: 123456',
-            ),
+            decoration: const InputDecoration(hintText: 'Ex: 123456'),
           ),
           actions: [
             TextButton(

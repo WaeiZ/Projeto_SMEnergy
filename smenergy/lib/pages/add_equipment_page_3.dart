@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:smenergy/pages/add_equipment_page_4.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/services/config_service.dart';
+import 'package:smenergy/services/device_provisioning_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class SetupStepTwoPage extends StatefulWidget {
@@ -13,8 +13,61 @@ class SetupStepTwoPage extends StatefulWidget {
 
 class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
   bool _isObscure = true;
+  bool _isConnecting = false;
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
+  final DeviceProvisioningService _provisioningService =
+      DeviceProvisioningService();
+
+  @override
+  void dispose() {
+    _ssidController.dispose();
+    _passController.dispose();
+    super.dispose();
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _connectDevice() async {
+    if (_isConnecting) return;
+
+    final ssid = _ssidController.text.trim();
+    final password = _passController.text;
+    if (ssid.isEmpty) {
+      _showMessage('Preenche o SSID da tua rede Wi-Fi.');
+      return;
+    }
+
+    setState(() => _isConnecting = true);
+    try {
+      final result = await _provisioningService.provisionDevice(
+        ssid: ssid,
+        password: password,
+      );
+      if (!mounted) return;
+
+      if (!result.success) {
+        _showMessage(result.message);
+        return;
+      }
+
+      await ConfigService.setConfigStatus(1);
+      if (!mounted) return;
+
+      _showMessage(result.message);
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardPage()),
+        (route) => false,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isConnecting = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +116,7 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
             ),
             const SizedBox(height: 25),
             const Text(
-              '4. Conecte-se a uma rede Wi-Fi',
+              '5. De volta à app, configure a rede Wi-Fi da casa',
               style: TextStyle(fontSize: 14, color: Colors.black87),
             ),
             const SizedBox(height: 30),
@@ -97,23 +150,9 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
             const SizedBox(height: 420),
 
             CustomGradientButton(
-              text: 'Conectar',
+              text: _isConnecting ? 'A conectar...' : 'Conectar',
               gradient: myGradient,
-              onPressed: () async {
-                // 1. Grava que está configurado (Produção)
-                await ConfigService.setConfigStatus(1);
-
-                // (Impede o utilizador de voltar ao setup com o botão 'back')
-                if (mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const DashboardPage(),
-                    ),
-                    (route) => false,
-                  );
-                }
-              },
+              onPressed: _isConnecting ? null : _connectDevice,
             ),
 
             const SizedBox(height: 30),

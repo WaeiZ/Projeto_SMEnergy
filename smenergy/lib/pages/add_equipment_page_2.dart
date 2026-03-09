@@ -1,8 +1,91 @@
 import 'package:flutter/material.dart';
 import 'package:smenergy/pages/add_equipment_page_3.dart';
+import 'package:smenergy/services/device_provisioning_service.dart';
+import 'package:smenergy/services/wifi_settings_service.dart';
 
-class SetupStepOnePage extends StatelessWidget {
+class SetupStepOnePage extends StatefulWidget {
   const SetupStepOnePage({super.key});
+
+  @override
+  State<SetupStepOnePage> createState() => _SetupStepOnePageState();
+}
+
+class _SetupStepOnePageState extends State<SetupStepOnePage>
+    with WidgetsBindingObserver {
+  final WifiSettingsService _wifiSettingsService = WifiSettingsService();
+  final DeviceProvisioningService _provisioningService =
+      DeviceProvisioningService();
+
+  bool _waitingReturnFromSettings = false;
+  bool _checkingDevice = false;
+  bool _navigated = false;
+  String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _waitingReturnFromSettings) {
+      _checkDeviceAndContinue();
+    }
+  }
+
+  Future<void> _openWifiSettings() async {
+    final opened = await _wifiSettingsService.openWifiSettings();
+    if (!mounted) return;
+
+    if (!opened) {
+      setState(() {
+        _statusMessage =
+            'Não foi possível abrir as definições de Wi-Fi automaticamente.';
+      });
+      return;
+    }
+
+    setState(() {
+      _waitingReturnFromSettings = true;
+      _statusMessage =
+          'Liga-te ao SMEnergy_AP nas definições e depois volta à app.';
+    });
+  }
+
+  Future<void> _checkDeviceAndContinue() async {
+    if (_checkingDevice || _navigated) return;
+
+    setState(() => _checkingDevice = true);
+    final reachable = await _provisioningService
+        .isProvisioningDeviceReachable();
+    if (!mounted) return;
+
+    setState(() {
+      _checkingDevice = false;
+      if (!reachable) {
+        _statusMessage =
+            'Ainda não detetámos o equipamento. Liga-te ao SMEnergy_AP e volta à app.';
+      }
+    });
+
+    if (!reachable || _navigated) {
+      return;
+    }
+
+    _navigated = true;
+    _waitingReturnFromSettings = false;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SetupStepTwoPage()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,7 +94,6 @@ class SetupStepOnePage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // Alinhamento do "1/2" próximo à seta conforme o design
         leadingWidth: 100,
         leading: Row(
           children: [
@@ -24,7 +106,7 @@ class SetupStepOnePage extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
             ),
             const Text(
-              "1/2",
+              '1/2',
               style: TextStyle(
                 color: Colors.black,
                 fontSize: 16,
@@ -50,21 +132,20 @@ class SetupStepOnePage extends StatelessWidget {
             ),
             const SizedBox(height: 25),
 
-            // LISTA DE INSTRUÇÕES
             const Text(
-              '1. Ligar Equipamento à tomada\n'
-              '2. Ligar WiFi 2.4 GHz do telemóvel\n'
-              '3. Selecionar a Rede de Equipamento',
+              '1. Ligar equipamento à tomada\n'
+              '2. Ligar Wi-Fi 2.4 GHz no telemóvel\n'
+              '3. Tocar em SMEnergy_AP para abrir Wi-Fi\n'
+              '4. Ligar ao SMEnergy_AP e voltar à app',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.black87,
-                height: 1.8, // Espaçamento entre linhas
+                height: 1.8,
               ),
             ),
 
             const SizedBox(height: 40),
 
-            // CAIXA DE SELECÇÃO WIFI (O CARD DO PRINT)
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
@@ -72,14 +153,13 @@ class SetupStepOnePage extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // Cabeçalho da caixa (Barra azul clara)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50.withOpacity(0.5),
+                      color: Colors.blue.shade50.withValues(alpha: 0.5),
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(10),
                       ),
@@ -98,8 +178,6 @@ class SetupStepOnePage extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                  // Item da Rede (Onde o utilizador clica)
                   ListTile(
                     title: const Text(
                       'SMEnergy_AP',
@@ -108,23 +186,54 @@ class SetupStepOnePage extends StatelessWidget {
                         fontSize: 15,
                       ),
                     ),
+                    subtitle: const Text('Toca para abrir as definições Wi-Fi'),
                     trailing: const Icon(
-                      Icons.wifi,
+                      Icons.settings,
                       color: Colors.black,
                       size: 20,
                     ),
-                    onTap: () {
-                      // NAVEGAÇÃO PARA O PASSO 2/2
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SetupStepTwoPage(),
-                        ),
-                      );
-                    },
+                    onTap: _openWifiSettings,
                   ),
                 ],
               ),
+            ),
+
+            const SizedBox(height: 18),
+
+            if (_checkingDevice)
+              const Row(
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'A verificar ligação ao equipamento...',
+                      style: TextStyle(fontSize: 13, color: Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+
+            if (!_checkingDevice && _statusMessage != null)
+              Text(
+                _statusMessage!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _waitingReturnFromSettings
+                      ? Colors.blue.shade700
+                      : Colors.orange.shade800,
+                ),
+              ),
+
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _checkingDevice ? null : _checkDeviceAndContinue,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Já voltei à app, continuar'),
             ),
           ],
         ),

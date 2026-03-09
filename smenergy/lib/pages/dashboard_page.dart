@@ -26,17 +26,12 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _dashboardStream = _energyDataService.streamDashboardData();
-    _ensureSeedData();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
-  }
-
-  Future<void> _ensureSeedData() async {
-    await _energyDataService.seedDemoDataIfEmpty();
   }
 
   @override

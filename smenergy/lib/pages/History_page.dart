@@ -49,7 +49,6 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _bootstrap() async {
     try {
-      await _energyDataService.seedDemoDataIfEmpty();
       final sensors = await _energyDataService.fetchSensors();
       if (!mounted) return;
 
@@ -136,11 +135,6 @@ class _HistoryPageState extends State<HistoryPage> {
                   const SizedBox(height: 8),
                   _buildSensorDropdown(),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Selecionar Medida',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
                   _buildMeasureDropdown(),
                   const SizedBox(height: 16),
                   Row(
@@ -208,51 +202,89 @@ class _HistoryPageState extends State<HistoryPage> {
       );
     }
 
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: _selectedSensorId,
-        items: _sensors
-            .map(
-              (sensor) => DropdownMenuItem<String>(
-                value: sensor.id,
-                child: Text(
-                  sensor.name,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Selecionar Sensor',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedSensorId,
+          decoration: _selectionDecoration(),
+          items: _sensors
+              .map(
+                (sensor) => DropdownMenuItem<String>(
+                  value: sensor.id,
+                  child: Text(
+                    sensor.name,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
                 ),
-              ),
-            )
-            .toList(),
-        icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
-        onChanged: (value) {
-          if (value == null) return;
-          setState(() => _selectedSensorId = value);
-          _reloadChartData();
-        },
-      ),
+              )
+              .toList(),
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _selectedSensorId = value);
+            _reloadChartData();
+          },
+        ),
+      ],
     );
   }
 
   Widget _buildMeasureDropdown() {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: _selectedMeasure,
-        items: _measures
-            .map(
-              (measure) => DropdownMenuItem<String>(
-                value: measure,
-                child: Text(
-                  measure,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Selecionar Medida',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedMeasure,
+          decoration: _selectionDecoration(),
+          items: _measures
+              .map(
+                (measure) => DropdownMenuItem<String>(
+                  value: measure,
+                  child: Text(
+                    measure,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
                 ),
-              ),
-            )
-            .toList(),
-        icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
-        onChanged: (value) {
-          if (value == null) return;
-          setState(() => _selectedMeasure = value);
-          _reloadChartData();
-        },
+              )
+              .toList(),
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _selectedMeasure = value);
+            _reloadChartData();
+          },
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _selectionDecoration() {
+    return InputDecoration(
+      filled: true,
+      fillColor: const Color(0xFFF9FBFF),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD4E6FB)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFD4E6FB)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF3DA5FA), width: 1.5),
       ),
     );
   }
@@ -342,6 +374,7 @@ class _HistoryPageState extends State<HistoryPage> {
     final highestValue = _chartValues.reduce(max);
     final maxY = max(100.0, (highestValue * 1.25).ceilToDouble());
     final interval = max(20.0, (maxY / 4).ceilToDouble());
+    final barWidth = _chartValues.length <= 6 ? 18.0 : 16.0;
 
     return Container(
       height: 230,
@@ -357,18 +390,25 @@ class _HistoryPageState extends State<HistoryPage> {
           maxY: maxY,
           alignment: BarChartAlignment.spaceAround,
           barTouchData: BarTouchData(
-            enabled: false,
-            handleBuiltInTouches: false,
+            enabled: true,
+            handleBuiltInTouches: true,
             touchTooltipData: BarTouchTooltipData(
-              tooltipPadding: EdgeInsets.zero,
-              tooltipMargin: 6,
-              getTooltipColor: (group) => Colors.transparent,
+              tooltipPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+              tooltipMargin: 8,
+              getTooltipColor: (_) => const Color(0xFF1E2A3A),
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final index = group.x;
+                if (index < 0 || index >= _chartLabels.length) {
+                  return null;
+                }
                 return BarTooltipItem(
-                  rod.toY.toStringAsFixed(0),
+                  '${_chartLabels[index]}\n${rod.toY.toStringAsFixed(1)} W',
                   const TextStyle(
-                    color: Color(0xFF8C9BB5),
-                    fontSize: 12,
+                    color: Colors.white,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
                 );
@@ -409,17 +449,22 @@ class _HistoryPageState extends State<HistoryPage> {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 28,
+                reservedSize: 40,
                 getTitlesWidget: (value, meta) {
                   final index = value.toInt();
                   if (index < 0 || index >= _chartLabels.length) {
                     return const SizedBox.shrink();
                   }
-                  return Text(
-                    _chartLabels[index],
-                    style: const TextStyle(
-                      color: Color(0xFF8C9BB5),
-                      fontSize: 12,
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      _chartLabels[index],
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF8C9BB5),
+                        fontSize: 10,
+                        height: 1.1,
+                      ),
                     ),
                   );
                 },
@@ -427,22 +472,21 @@ class _HistoryPageState extends State<HistoryPage> {
             ),
           ),
           borderData: FlBorderData(show: false),
-          barGroups: _buildBarGroups(),
+          barGroups: _buildBarGroups(barWidth),
         ),
       ),
     );
   }
 
-  List<BarChartGroupData> _buildBarGroups() {
+  List<BarChartGroupData> _buildBarGroups(double barWidth) {
     return List.generate(
       _chartValues.length,
       (index) => BarChartGroupData(
         x: index,
-        showingTooltipIndicators: const [0],
         barRods: [
           BarChartRodData(
             toY: _chartValues[index],
-            width: 18,
+            width: barWidth,
             color: const Color(0xFF3DA5FA),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -454,7 +498,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _buildAdditionalDataSection() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -471,7 +515,7 @@ class _HistoryPageState extends State<HistoryPage> {
               color: Colors.black87,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -480,7 +524,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   value: _historyData.sampleCount.toString(),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildMetricCard(
                   label: 'Média',
@@ -489,7 +533,7 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
@@ -498,7 +542,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   value: '${_historyData.maxWatts.toStringAsFixed(1)} W',
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildMetricCard(
                   label: 'Mínimo',
@@ -507,10 +551,25 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          _buildMetricCard(
-            label: 'Consumo estimado',
-            value: '${_historyData.totalKwh.toStringAsFixed(2)} kWh',
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  label: 'Consumo estimado',
+                  value: '${_historyData.totalKwh.toStringAsFixed(2)} kWh',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetricCard(
+                  label: 'Custo estimado',
+                  value: _historyData.costConfigured
+                      ? '${_historyData.estimatedCostEur.toStringAsFixed(2)} €'
+                      : 'Configurar contrato',
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -519,7 +578,9 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Widget _buildMetricCard({required String label, required String value}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 78),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFF7FAFF),
         borderRadius: BorderRadius.circular(12),
@@ -532,16 +593,16 @@ class _HistoryPageState extends State<HistoryPage> {
             label,
             style: const TextStyle(
               color: Color(0xFF7C8CA8),
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             value,
             style: const TextStyle(
               color: Colors.black87,
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -628,6 +689,19 @@ class _HistoryPageState extends State<HistoryPage> {
                   'Consumo estimado',
                   '${_historyData.totalKwh.toStringAsFixed(2)} kWh',
                 ),
+                _pdfSummaryRow(
+                  'Contrato aplicado',
+                  _historyData.costConfigured &&
+                          _historyData.contractLabel.isNotEmpty
+                      ? _historyData.contractLabel
+                      : 'Não configurado',
+                ),
+                _pdfSummaryRow(
+                  'Custo estimado',
+                  _historyData.costConfigured
+                      ? '${_historyData.estimatedCostEur.toStringAsFixed(2)} €'
+                      : 'Não configurado',
+                ),
               ],
             ),
             pw.SizedBox(height: 12),
@@ -639,7 +713,7 @@ class _HistoryPageState extends State<HistoryPage> {
             if (rows.isEmpty)
               pw.Text('Sem dados disponíveis para o período selecionado.')
             else
-              pw.Table.fromTextArray(
+              pw.TableHelper.fromTextArray(
                 headers: const ['Data', 'Valor (W)'],
                 data: rows,
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),

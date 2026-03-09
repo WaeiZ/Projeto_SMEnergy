@@ -21,11 +21,6 @@ class _AlertPageState extends State<AlertPage> {
   void initState() {
     super.initState();
     _alertStream = _energyDataService.streamAlertData();
-    _ensureSeedData();
-  }
-
-  Future<void> _ensureSeedData() async {
-    await _energyDataService.seedDemoDataIfEmpty();
   }
 
   @override
