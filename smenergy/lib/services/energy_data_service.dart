@@ -623,14 +623,14 @@ class EnergyDataService {
         ? _estimateCostFromBreakdown(tariffBreakdown, profile)
         : 0.0;
 
-    final byDay = <DateTime, List<double>>{};
+    final byDay = <DateTime, List<_ReadingSample>>{};
     for (final reading in readings) {
       final day = DateTime(
         reading.timestamp.year,
         reading.timestamp.month,
         reading.timestamp.day,
       );
-      byDay.putIfAbsent(day, () => <double>[]).add(reading.watts);
+      byDay.putIfAbsent(day, () => <_ReadingSample>[]).add(reading);
     }
 
     final labels = <String>[];
@@ -638,9 +638,18 @@ class EnergyDataService {
     DateTime cursor = DateTime(start.year, start.month, start.day);
     final endDay = DateTime(end.year, end.month, end.day);
     while (!cursor.isAfter(endDay)) {
-      final samples = byDay[cursor] ?? const <double>[];
+      final dayStart = cursor;
+      final dayEnd = _endOfDay(cursor);
+      final samples = byDay[cursor] ?? const <_ReadingSample>[];
       labels.add(_formatDayLabel(cursor));
-      values.add(_applyMeasure(samples, measure));
+      values.add(
+        _applyHistoryMeasure(
+          samples,
+          measure: measure,
+          start: dayStart,
+          end: dayEnd,
+        ),
+      );
       cursor = cursor.add(const Duration(days: 1));
     }
 
@@ -688,7 +697,7 @@ class EnergyDataService {
   }
 
   _HistorySeriesData _aggregateHistoryByBuckets(
-    Map<DateTime, List<double>> byDay, {
+    Map<DateTime, List<_ReadingSample>> byDay, {
     required DateTime start,
     required DateTime end,
     required String measure,
@@ -708,15 +717,22 @@ class EnergyDataService {
           ? end
           : bucketEndCandidate;
 
-      final bucketSamples = <double>[];
+      final bucketSamples = <_ReadingSample>[];
       DateTime day = bucketStart;
       while (!day.isAfter(bucketEnd)) {
-        bucketSamples.addAll(byDay[day] ?? const <double>[]);
+        bucketSamples.addAll(byDay[day] ?? const <_ReadingSample>[]);
         day = day.add(const Duration(days: 1));
       }
 
       labels.add(_formatBucketLabel(bucketStart, bucketEnd));
-      values.add(_applyMeasure(bucketSamples, measure));
+      values.add(
+        _applyHistoryMeasure(
+          bucketSamples,
+          measure: measure,
+          start: bucketStart,
+          end: _endOfDay(bucketEnd),
+        ),
+      );
       bucketStart = bucketEnd.add(const Duration(days: 1));
     }
 
@@ -875,21 +891,41 @@ class EnergyDataService {
     return _ReadingSample(timestamp: timestamp, watts: watts);
   }
 
+  double _applyHistoryMeasure(
+    List<_ReadingSample> readings, {
+    required String measure,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    if (readings.isEmpty) return 0;
+
+    if (measure == 'Energia gasta (kWh)') {
+      return _estimateEnergyKwh(readings, start: start, end: end);
+    }
+
+    final samples = readings.map((reading) => reading.watts).toList();
+    return _applyMeasure(samples, measure);
+  }
+
   double _applyMeasure(List<double> samples, String measure) {
     if (samples.isEmpty) return 0;
 
     switch (measure) {
-      case 'Máximo':
+      case 'Máximo (W)':
         return samples.reduce(max);
-      case 'Mínimo':
+      case 'Mínimo (W)':
         return samples.reduce(min);
-      case 'Média':
+      case 'Média (W)':
       default:
         final avg =
             samples.fold<double>(0, (acc, value) => acc + value) /
             samples.length;
         return avg;
     }
+  }
+
+  DateTime _endOfDay(DateTime day) {
+    return DateTime(day.year, day.month, day.day, 23, 59, 59);
   }
 
   _TariffEnergyBreakdown _estimateTariffEnergyBreakdown(

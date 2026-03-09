@@ -20,13 +20,22 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   final EnergyDataService _energyDataService = EnergyDataService();
+  static const String _averageMeasure = 'Média (W)';
+  static const String _maximumMeasure = 'Máximo (W)';
+  static const String _minimumMeasure = 'Mínimo (W)';
+  static const String _energyMeasure = 'Energia gasta (kWh)';
 
   int _selectedIndex = 1;
-  final List<String> _measures = ['Média', 'Máximo', 'Mínimo'];
+  final List<String> _measures = [
+    _averageMeasure,
+    _maximumMeasure,
+    _minimumMeasure,
+    _energyMeasure,
+  ];
 
   List<EnergySensorOption> _sensors = [];
   String? _selectedSensorId;
-  String _selectedMeasure = 'Média';
+  String _selectedMeasure = _averageMeasure;
 
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 6));
   DateTime _endDate = DateTime.now();
@@ -40,6 +49,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   List<double> get _chartValues => _historyData.values;
   List<String> get _chartLabels => _historyData.labels;
+  bool get _isEnergyMeasureSelected => _selectedMeasure == _energyMeasure;
 
   @override
   void initState() {
@@ -372,8 +382,12 @@ class _HistoryPageState extends State<HistoryPage> {
     }
 
     final highestValue = _chartValues.reduce(max);
-    final maxY = max(100.0, (highestValue * 1.25).ceilToDouble());
-    final interval = max(20.0, (maxY / 4).ceilToDouble());
+    final maxY = _isEnergyMeasureSelected
+        ? max(1.0, highestValue * 1.25)
+        : max(100.0, (highestValue * 1.25).ceilToDouble());
+    final interval = _isEnergyMeasureSelected
+        ? max(0.25, maxY / 4)
+        : max(20.0, (maxY / 4).ceilToDouble());
     final barWidth = _chartValues.length <= 6 ? 18.0 : 16.0;
 
     return Container(
@@ -405,7 +419,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   return null;
                 }
                 return BarTooltipItem(
-                  '${_chartLabels[index]}\n${rod.toY.toStringAsFixed(1)} W',
+                  '${_chartLabels[index]}\n${_formatMeasureValue(rod.toY)}',
                   const TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -438,7 +452,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 interval: interval,
                 reservedSize: 32,
                 getTitlesWidget: (value, meta) => Text(
-                  value.toInt().toString(),
+                  _formatAxisValue(value),
                   style: const TextStyle(
                     color: Color(0xFF8C9BB5),
                     fontSize: 12,
@@ -476,6 +490,22 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
       ),
     );
+  }
+
+  String _formatMeasureValue(double value) {
+    if (_isEnergyMeasureSelected) {
+      return '${value.toStringAsFixed(2)} kWh';
+    }
+    return '${value.toStringAsFixed(1)} W';
+  }
+
+  String _formatAxisValue(double value) {
+    if (_isEnergyMeasureSelected) {
+      if (value >= 10) return value.toStringAsFixed(0);
+      if (value >= 1) return value.toStringAsFixed(1);
+      return value.toStringAsFixed(2);
+    }
+    return value.toInt().toString();
   }
 
   List<BarChartGroupData> _buildBarGroups(double barWidth) {

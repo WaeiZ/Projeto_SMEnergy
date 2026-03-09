@@ -83,31 +83,7 @@ class _ProfilePageState extends State<ProfilePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  width: 62,
-                  height: 62,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF3DA5FA),
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Color(0xFF3DA5FA),
-                    size: 38,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Text(
-                  'Sérgio Dias',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-              ],
-            ),
+            _buildProfileHeader(),
             const SizedBox(height: 16),
             _buildProgressCard(),
             const SizedBox(height: 16),
@@ -157,11 +133,124 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildProfileHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFDCEBFF)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              gradient: AppGradients.blueLinear,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3DA5FA).withValues(alpha: 0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+              child: Container(
+                margin: const EdgeInsets.all(7),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFEAF4FF),
+                ),
+                child: const Icon(
+                  Icons.person_rounded,
+                  color: Color(0xFF1D7EF8),
+                  size: 34,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sérgio Dias',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2F3443),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Conta SMEnergy',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6C86A2),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color(0xFFDCEBFF)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.bolt_rounded,
+                        size: 14,
+                        color: Color(0xFF1D7EF8),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Perfil ativo',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2F3443),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProgressCard() {
+    const currentPoints = 500;
+    const targetPoints = 1000;
+    const levelName = 'Pulse';
+    final progress = currentPoints / targetPoints;
+    final progressPercent = (progress * 100).round();
+    final missingPoints = targetPoints - currentPoints;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         onTap: () {
           Navigator.push(
             context,
@@ -169,65 +258,170 @@ class _ProfilePageState extends State<ProfilePage> {
           );
         },
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF3DA5FA)),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF3DA5FA), width: 1.2),
+            color: const Color(0xFFF7FBFF),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF3DA5FA).withValues(alpha: 0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Text(
-                    'Nível:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF3DA5FA),
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Gamificação',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6C86A2),
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text(
+                              levelName,
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF2F3443),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: const Color(0xFFDCEBFF),
+                                ),
+                              ),
+                              child: const Text(
+                                'Nível atual',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1D7EF8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Faltam $missingPoints pontos para o próximo objetivo.',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6C86A2),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Pulse',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  const Spacer(),
-                  _buildLevelBadge(),
+                  _buildLevelBadge(levelName),
                 ],
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Progresso',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFDCEBFF)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Progresso',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2F3443),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '$progressPercent%',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1D7EF8),
+                          ),
+                        ),
+                      ],
                     ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF3DA5FA),
-                      borderRadius: BorderRadius.circular(20),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _buildProgressPill('$currentPoints/$targetPoints'),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildProgressBar(value: progress)),
+                      ],
                     ),
-                    child: const Text(
-                      '500/1000',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'Próximo nível: 1000',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6C86A2),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFF6C86A2),
+                          size: 18,
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildProgressBar(value: 0.5)),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressPill(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        gradient: AppGradients.blueLinear,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        value,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -362,55 +556,91 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProgressBar({required double value}) {
+    final safeValue = value.clamp(0.0, 1.0);
+
     return Container(
-      height: 16,
+      height: 14,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF3DA5FA), width: 1.5),
+        color: const Color(0xFFE7F1FE),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: LinearProgressIndicator(
-          value: value,
-          minHeight: 16,
-          backgroundColor: const Color(0xFFE6F2FF),
-          valueColor: const AlwaysStoppedAnimation(Color(0xFF3DA5FA)),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              Container(
+                width: constraints.maxWidth * safeValue,
+                decoration: BoxDecoration(
+                  gradient: AppGradients.blueLinear,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLevelBadge(String levelName) {
+    return Container(
+      width: 62,
+      height: 62,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        gradient: AppGradients.blueLinear,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF3DA5FA).withValues(alpha: 0.2),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+        ),
+        child: Center(
+          child: Container(
+            width: 34,
+            height: 34,
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFEAF4FF),
+              border: Border.all(color: const Color(0xFF3DA5FA), width: 1.4),
+            ),
+            child: _buildLevelAssetIcon(levelName),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLevelBadge() {
-    return SizedBox(
-      width: 42,
-      height: 42,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF3DA5FA), width: 2),
-            ),
-          ),
-          Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF3DA5FA), width: 2),
-            ),
-          ),
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: Color(0xFF3DA5FA),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildLevelAssetIcon(String levelName) {
+    final asset = switch (levelName.toLowerCase()) {
+      'pulse' => 'assets/icons/pulse_icon.png',
+      'volt' => 'assets/icons/volt_icon.png',
+      'zeus' => 'assets/icons/zeus_icon.png',
+      _ => 'assets/icons/pulse_icon.png',
+    };
+
+    final fallback = switch (levelName.toLowerCase()) {
+      'pulse' => Icons.radio_button_checked,
+      'volt' => Icons.bolt_rounded,
+      'zeus' => Icons.workspace_premium_rounded,
+      _ => Icons.radio_button_checked,
+    };
+
+    return Image.asset(
+      asset,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return Icon(fallback, color: const Color(0xFF1D7EF8), size: 18);
+      },
     );
   }
 
