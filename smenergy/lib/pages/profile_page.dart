@@ -47,6 +47,17 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Future<void> _openElectricitySettings() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (context) => const ElectricitySettingsPage()),
+    );
+
+    if (updated == true) {
+      _loadElectricityProfile();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final myGradient = AppGradients.blueLinear;
@@ -101,22 +112,6 @@ class _ProfilePageState extends State<ProfilePage> {
             _buildProgressCard(),
             const SizedBox(height: 16),
             _buildElectricityCard(),
-            const SizedBox(height: 12),
-            CustomGradientButton(
-              text: 'Definições de Eletricidade',
-              gradient: myGradient,
-              onPressed: () async {
-                final updated = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ElectricitySettingsPage(),
-                  ),
-                );
-                if (updated == true) {
-                  _loadElectricityProfile();
-                }
-              },
-            ),
             const SizedBox(height: 12),
             CustomGradientButton(
               text: 'Definições do Equipamento',
@@ -240,69 +235,95 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildElectricityCard() {
     if (_isLoadingElectricity) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF3DA5FA)),
+          onTap: _openElectricitySettings,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF3DA5FA)),
+              color: const Color(0xFFF7FBFF),
+            ),
+            child: const Center(child: CircularProgressIndicator()),
+          ),
         ),
-        child: const Center(child: CircularProgressIndicator()),
       );
     }
 
     final profile = _electricityProfile;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF3DA5FA)),
-        color: const Color(0xFFF7FBFF),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Definições de Eletricidade',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF3DA5FA),
-              fontWeight: FontWeight.bold,
-            ),
+        onTap: _openElectricitySettings,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF3DA5FA)),
+            color: const Color(0xFFF7FBFF),
           ),
-          const SizedBox(height: 8),
-          if (!profile.isConfigured)
-            const Text(
-              'Ainda não configuraste o teu contrato elétrico.',
-              style: TextStyle(fontSize: 13, color: Colors.black87),
-            )
-          else ...[
-            Row(
-              children: [
-                Expanded(
-                  child: _buildElectricityMetric(
-                    'Contrato',
-                    profile.contractType.label,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: const [
+                  Expanded(
+                    child: Text(
+                      'Definições de Eletricidade',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF3DA5FA),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: Color(0xFF3DA5FA),
+                    size: 22,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (!profile.isConfigured)
+                const Text(
+                  'Ainda não configuraste o teu contrato elétrico.',
+                  style: TextStyle(fontSize: 13, color: Colors.black87),
+                )
+              else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildElectricityMetric(
+                        'Contrato',
+                        profile.contractType.label,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildElectricityMetric(
+                        'Consumo mensal',
+                        '${profile.totalMonthlyConsumptionKwh.toStringAsFixed(1)} kWh',
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildElectricityMetric(
-                    'Consumo mensal',
-                    '${profile.totalMonthlyConsumptionKwh.toStringAsFixed(1)} kWh',
-                  ),
+                const SizedBox(height: 10),
+                _buildElectricityMetric(
+                  'Custo estimado',
+                  '${profile.estimatedCostEur.toStringAsFixed(2)} € / mês',
                 ),
               ],
-            ),
-            const SizedBox(height: 10),
-            _buildElectricityMetric(
-              'Custo estimado',
-              '${profile.estimatedCostEur.toStringAsFixed(2)} € / mês',
-            ),
-          ],
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
