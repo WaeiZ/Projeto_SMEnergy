@@ -298,6 +298,90 @@ class EnergyAlertData {
   final EnergyActiveAlert? activeAlert;
 }
 
+enum GamificationLevel {
+  pulse('Pulse', 0, 'assets/icons/pulse_icon.png'),
+  volt('Volt', 1500, 'assets/icons/volt_icon.png'),
+  zeus('Zeus', 3000, 'assets/icons/zeus_icon.png');
+
+  const GamificationLevel(this.label, this.minPoints, this.assetPath);
+
+  final String label;
+  final int minPoints;
+  final String assetPath;
+
+  GamificationLevel? get nextLevel {
+    switch (this) {
+      case GamificationLevel.pulse:
+        return GamificationLevel.volt;
+      case GamificationLevel.volt:
+        return GamificationLevel.zeus;
+      case GamificationLevel.zeus:
+        return null;
+    }
+  }
+
+  static GamificationLevel fromPoints(int points) {
+    if (points >= GamificationLevel.zeus.minPoints) {
+      return GamificationLevel.zeus;
+    }
+    if (points >= GamificationLevel.volt.minPoints) {
+      return GamificationLevel.volt;
+    }
+    return GamificationLevel.pulse;
+  }
+}
+
+class GamificationProfile {
+  GamificationProfile({required this.points})
+    : level = GamificationLevel.fromPoints(points);
+
+  const GamificationProfile.empty()
+    : points = 0,
+      level = GamificationLevel.pulse;
+
+  final int points;
+  final GamificationLevel level;
+
+  GamificationLevel? get nextLevel => level.nextLevel;
+
+  int get pointsToNext {
+    final next = nextLevel;
+    if (next == null) return 0;
+    return max(0, next.minPoints - points);
+  }
+
+  double get progress {
+    final next = nextLevel;
+    if (next == null) return 1;
+
+    final floor = level.minPoints;
+    final span = next.minPoints - floor;
+    if (span <= 0) return 1;
+
+    return ((points - floor) / span).clamp(0.0, 1.0).toDouble();
+  }
+
+  int get progressPercent => (progress * 100).round();
+
+  int get progressTargetPoints => nextLevel?.minPoints ?? points;
+
+  String get helperText {
+    final next = nextLevel;
+    if (next == null) {
+      return 'Nível máximo alcançado.';
+    }
+    return 'Faltam $pointsToNext pontos para chegar a ${next.label}.';
+  }
+
+  String get progressLabel {
+    final next = nextLevel;
+    if (next == null) {
+      return '$points pontos';
+    }
+    return '$points/${next.minPoints}';
+  }
+}
+
 class EnergyDataService {
   EnergyDataService({FirebaseAuth? auth, FirebaseFirestore? db})
     : _auth = auth ?? FirebaseAuth.instance,
@@ -480,6 +564,36 @@ class EnergyDataService {
       return ElectricityCostProfile.fromMap(raw.cast<String, dynamic>());
     }
     return const ElectricityCostProfile.empty();
+  }
+
+  Future<GamificationProfile> fetchGamificationProfile() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      return const GamificationProfile.empty();
+    }
+
+    final snapshot = await _db.collection('users').doc(uid).get();
+    return GamificationProfile(points: _asInt(snapshot.data()?['points']));
+  }
+
+  Future<GamificationProfile> addGamificationPoints(int rewardPoints) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('Utilizador não autenticado.');
+    }
+
+    final safeReward = max(0, rewardPoints);
+    final userRef = _db.collection('users').doc(uid);
+
+    final updatedPoints = await _db.runTransaction<int>((transaction) async {
+      final snapshot = await transaction.get(userRef);
+      final currentPoints = _asInt(snapshot.data()?['points']);
+      final nextPoints = currentPoints + safeReward;
+      transaction.set(userRef, {'points': nextPoints}, SetOptions(merge: true));
+      return nextPoints;
+    });
+
+    return GamificationProfile(points: updatedPoints);
   }
 
   Future<void> saveElectricityCostProfile(
@@ -1156,6 +1270,13 @@ class EnergyDataService {
   double _asDouble(dynamic value, {double fallback = 0}) {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  int _asInt(dynamic value, {int fallback = 0}) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    if (value is String) return int.tryParse(value) ?? fallback;
     return fallback;
   }
 

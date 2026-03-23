@@ -23,6 +23,8 @@ class _ProfilePageState extends State<ProfilePage> {
   final AuthService _authService = AuthService();
   final EnergyDataService _energyDataService = EnergyDataService();
 
+  bool _isLoadingGamification = true;
+  GamificationProfile _gamificationProfile = const GamificationProfile.empty();
   bool _isLoadingElectricity = true;
   ElectricityCostProfile _electricityProfile =
       const ElectricityCostProfile.empty();
@@ -30,7 +32,22 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    _loadGamificationProfile();
     _loadElectricityProfile();
+  }
+
+  Future<void> _loadGamificationProfile() async {
+    try {
+      final profile = await _energyDataService.fetchGamificationProfile();
+      if (!mounted) return;
+      setState(() {
+        _gamificationProfile = profile;
+        _isLoadingGamification = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingGamification = false);
+    }
   }
 
   Future<void> _loadElectricityProfile() async {
@@ -240,22 +257,36 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildProgressCard() {
-    const currentPoints = 500;
-    const targetPoints = 1000;
-    const levelName = 'Pulse';
-    final progress = currentPoints / targetPoints;
-    final progressPercent = (progress * 100).round();
-    final missingPoints = targetPoints - currentPoints;
+    if (_isLoadingGamification) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF3DA5FA), width: 1.2),
+          color: const Color(0xFFF7FBFF),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final profile = _gamificationProfile;
+    final nextLevel = profile.nextLevel;
+    final currentPoints = profile.points;
+    final progressPercent = profile.progressPercent;
+    final levelName = profile.level.label;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const GamificationPage()),
           );
+          if (!mounted) return;
+          _loadGamificationProfile();
         },
         child: Container(
           padding: const EdgeInsets.all(18),
@@ -326,7 +357,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Faltam $missingPoints pontos para o próximo objetivo.',
+                          profile.helperText,
                           style: const TextStyle(
                             fontSize: 13,
                             color: Color(0xFF6C86A2),
@@ -374,18 +405,22 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        _buildProgressPill('$currentPoints/$targetPoints'),
+                        _buildProgressPill(profile.progressLabel),
                         const SizedBox(width: 12),
-                        Expanded(child: _buildProgressBar(value: progress)),
+                        Expanded(
+                          child: _buildProgressBar(value: profile.progress),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        const Text(
-                          'Próximo nível: 1000',
-                          style: TextStyle(
+                        Text(
+                          nextLevel == null
+                              ? '$currentPoints pontos totais'
+                              : 'Próximo nível: ${nextLevel.minPoints}',
+                          style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF6C86A2),
                             fontWeight: FontWeight.w600,

@@ -3,6 +3,7 @@ import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/profile_page.dart';
+import 'package:smenergy/services/energy_data_service.dart';
 
 class GamificationPage extends StatefulWidget {
   const GamificationPage({super.key});
@@ -13,6 +14,29 @@ class GamificationPage extends StatefulWidget {
 
 class _GamificationPageState extends State<GamificationPage> {
   int _selectedIndex = 3;
+  final EnergyDataService _energyDataService = EnergyDataService();
+  bool _isLoading = true;
+  GamificationProfile _profile = const GamificationProfile.empty();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGamificationProfile();
+  }
+
+  Future<void> _loadGamificationProfile() async {
+    try {
+      final profile = await _energyDataService.fetchGamificationProfile();
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,20 +61,179 @@ class _GamificationPageState extends State<GamificationPage> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            _buildLevelTimeline(),
-            const SizedBox(height: 24),
-          ],
-        ),
+        child: _isLoading
+            ? const Padding(
+                padding: EdgeInsets.only(top: 40),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  _buildSummaryCard(),
+                  const SizedBox(height: 20),
+                  _buildLevelTimeline(),
+                  const SizedBox(height: 24),
+                ],
+              ),
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
+  Widget _buildSummaryCard() {
+    final nextLevel = _profile.nextLevel;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFDCEBFF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Pontos acumulados',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6C86A2),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${_profile.points}',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2F3443),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _buildAssetIcon(
+                _profile.level.assetPath,
+                fallback: Icons.workspace_premium_rounded,
+                size: 58,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Text(
+                _profile.level.label,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1D7EF8),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFFDCEBFF)),
+                ),
+                child: const Text(
+                  'Nível atual',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1D7EF8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _profile.helperText,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6C86A2),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFDCEBFF)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Progresso',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2F3443),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${_profile.progressPercent}%',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1D7EF8),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildProgressPill(_profile.progressLabel),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildProgressBar(_profile.progress)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    nextLevel == null
+                        ? 'Nível máximo alcançado'
+                        : 'Próximo nível: ${nextLevel.minPoints}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6C86A2),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLevelTimeline() {
+    final levels = GamificationLevel.values;
     const double cardHeight = 110;
     const double cardSpacing = 16;
     const double dotColumnWidth = 40;
@@ -58,7 +241,8 @@ class _GamificationPageState extends State<GamificationPage> {
     const double lineWidth = 3;
     const double lineInset = (cardHeight / 2) - (dotSize / 2);
     const double lineLeft = (dotColumnWidth / 2) - (lineWidth / 2);
-    final totalHeight = (cardHeight * 3) + (cardSpacing * 2);
+    final totalHeight =
+        (cardHeight * levels.length) + (cardSpacing * (levels.length - 1));
 
     return SizedBox(
       height: totalHeight,
@@ -77,46 +261,24 @@ class _GamificationPageState extends State<GamificationPage> {
             ),
           ),
           Column(
-            children: [
-              _buildLevelRow(
-                dotColumnWidth: dotColumnWidth,
-                cardHeight: cardHeight,
-                title: 'Pulse',
-                points: '0 Pontos',
-                isActive: true,
-                child: _buildAssetIcon(
-                  'assets/icons/pulse_icon.png',
-                  fallback: Icons.radio_button_checked,
-                  size: 64,
+            children: List.generate(levels.length, (index) {
+              final level = levels[index];
+              final isCurrent = _profile.level == level;
+              final isUnlocked = _profile.points >= level.minPoints;
+
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: index == levels.length - 1 ? 0 : cardSpacing,
                 ),
-              ),
-              const SizedBox(height: cardSpacing),
-              _buildLevelRow(
-                dotColumnWidth: dotColumnWidth,
-                cardHeight: cardHeight,
-                title: 'Volt',
-                points: '1500 Pontos',
-                isActive: false,
-                child: _buildAssetIcon(
-                  'assets/icons/volt_icon.png',
-                  fallback: Icons.bolt,
-                  size: 56,
+                child: _buildLevelRow(
+                  dotColumnWidth: dotColumnWidth,
+                  cardHeight: cardHeight,
+                  level: level,
+                  isCurrent: isCurrent,
+                  isUnlocked: isUnlocked,
                 ),
-              ),
-              const SizedBox(height: cardSpacing),
-              _buildLevelRow(
-                dotColumnWidth: dotColumnWidth,
-                cardHeight: cardHeight,
-                title: 'Zeus',
-                points: '3000 Pontos',
-                isActive: false,
-                child: _buildAssetIcon(
-                  'assets/icons/zeus_icon.png',
-                  fallback: Icons.account_circle,
-                  size: 56,
-                ),
-              ),
-            ],
+              );
+            }),
           ),
         ],
       ),
@@ -126,11 +288,29 @@ class _GamificationPageState extends State<GamificationPage> {
   Widget _buildLevelRow({
     required double dotColumnWidth,
     required double cardHeight,
-    required String title,
-    required String points,
-    required bool isActive,
-    required Widget child,
+    required GamificationLevel level,
+    required bool isCurrent,
+    required bool isUnlocked,
   }) {
+    final backgroundColor = isCurrent
+        ? const Color(0xFFE6F2FF)
+        : isUnlocked
+        ? const Color(0xFFF7FBFF)
+        : Colors.white;
+    final borderColor = isCurrent || isUnlocked
+        ? const Color(0xFF3DA5FA)
+        : const Color(0xFFD8DCE3);
+    final statusLabel = isCurrent
+        ? 'Atual'
+        : isUnlocked
+        ? 'Desbloqueado'
+        : 'Bloqueado';
+    final statusColor = isCurrent
+        ? const Color(0xFF1D7EF8)
+        : isUnlocked
+        ? const Color(0xFF3DA5FA)
+        : const Color(0xFF8C9BB5);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -138,7 +318,10 @@ class _GamificationPageState extends State<GamificationPage> {
           width: dotColumnWidth,
           child: Align(
             alignment: Alignment.center,
-            child: _buildTimelineDot(isActive: isActive),
+            child: _buildTimelineDot(
+              isCurrent: isCurrent,
+              isUnlocked: isUnlocked,
+            ),
           ),
         ),
         Expanded(
@@ -146,21 +329,25 @@ class _GamificationPageState extends State<GamificationPage> {
             height: cardHeight,
             padding: const EdgeInsets.symmetric(horizontal: 18),
             decoration: BoxDecoration(
-              color: isActive ? const Color(0xFFE6F2FF) : Colors.white,
+              color: backgroundColor,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: const Color(0xFF3DA5FA), width: 1.5),
+              border: Border.all(color: borderColor, width: 1.5),
             ),
             child: Row(
               children: [
-                child,
+                _buildAssetIcon(
+                  level.assetPath,
+                  fallback: _fallbackIcon(level),
+                  size: level == GamificationLevel.pulse ? 64 : 56,
+                ),
                 const SizedBox(width: 18),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
+                        level.label,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -169,12 +356,35 @@ class _GamificationPageState extends State<GamificationPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        points,
-                        style: const TextStyle(
-                          color: Color(0xFF3DA5FA),
+                        '${level.minPoints} Pontos',
+                        style: TextStyle(
+                          color: isUnlocked
+                              ? const Color(0xFF3DA5FA)
+                              : const Color(0xFF8C9BB5),
                           fontSize: 14,
                         ),
-                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: statusColor,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -187,7 +397,10 @@ class _GamificationPageState extends State<GamificationPage> {
     );
   }
 
-  Widget _buildTimelineDot({required bool isActive}) {
+  Widget _buildTimelineDot({
+    required bool isCurrent,
+    required bool isUnlocked,
+  }) {
     return Container(
       width: 22,
       height: 22,
@@ -196,14 +409,16 @@ class _GamificationPageState extends State<GamificationPage> {
         color: Colors.white,
         border: Border.all(color: const Color(0xFF3DA5FA), width: 2),
       ),
-      child: isActive
+      child: isUnlocked
           ? Center(
               child: Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(
+                width: isCurrent ? 10 : 8,
+                height: isCurrent ? 10 : 8,
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Color(0xFF3DA5FA),
+                  color: isCurrent
+                      ? const Color(0xFF3DA5FA)
+                      : const Color(0xFFAED5FF),
                 ),
               ),
             )
@@ -211,19 +426,75 @@ class _GamificationPageState extends State<GamificationPage> {
     );
   }
 
-  Widget _buildAssetIcon(String asset, {required IconData fallback, double size = 54}) {
+  Widget _buildAssetIcon(
+    String asset, {
+    required IconData fallback,
+    double size = 54,
+  }) {
     return Image.asset(
       asset,
       width: size,
       height: size,
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
-        return Icon(
-          fallback,
-          color: const Color(0xFF3DA5FA),
-          size: size,
-        );
+        return Icon(fallback, color: const Color(0xFF3DA5FA), size: size);
       },
+    );
+  }
+
+  IconData _fallbackIcon(GamificationLevel level) {
+    switch (level) {
+      case GamificationLevel.pulse:
+        return Icons.radio_button_checked;
+      case GamificationLevel.volt:
+        return Icons.bolt_rounded;
+      case GamificationLevel.zeus:
+        return Icons.workspace_premium_rounded;
+    }
+  }
+
+  Widget _buildProgressPill(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1D7EF8),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        value,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressBar(double value) {
+    final safeValue = value.clamp(0.0, 1.0);
+
+    return Container(
+      height: 14,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE7F1FE),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              Container(
+                width: constraints.maxWidth * safeValue,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1D7EF8),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
