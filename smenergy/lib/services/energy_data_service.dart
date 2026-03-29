@@ -392,6 +392,50 @@ class EnergyDataService {
 
   static const Duration _defaultPollInterval = Duration(seconds: 15);
 
+  Future<bool> waitForFirstTelemetry({
+    Duration timeout = const Duration(seconds: 75),
+    Duration pollInterval = const Duration(seconds: 5),
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      return false;
+    }
+
+    final deadline = DateTime.now().add(timeout);
+
+    while (DateTime.now().isBefore(deadline)) {
+      final deviceRef = await _resolveActiveDeviceRef(uid);
+      if (deviceRef != null) {
+        final sensorDocs = await deviceRef.collection('sensors').get();
+        for (final sensorDoc in sensorDocs.docs) {
+          if (!_isDataDocument(sensorDoc)) continue;
+
+          final data = sensorDoc.data();
+          final hasCurrentWatts =
+              data['current_watts'] != null ||
+              data['watts'] != null ||
+              data['value'] != null;
+          final hasLastReading =
+              _asDateTime(data['last_reading_at'] ?? data['updated_at']) !=
+              null;
+
+          if (hasCurrentWatts || hasLastReading) {
+            return true;
+          }
+
+          final latestReading = await _fetchLatestReading(sensorDoc.reference);
+          if (latestReading != null) {
+            return true;
+          }
+        }
+      }
+
+      await Future<void>.delayed(pollInterval);
+    }
+
+    return false;
+  }
+
   Stream<EnergyDashboardData> streamDashboardData({
     Duration interval = _defaultPollInterval,
   }) async* {
