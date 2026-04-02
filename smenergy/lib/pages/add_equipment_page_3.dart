@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/services/config_service.dart';
 import 'package:smenergy/services/device_provisioning_service.dart';
+import 'package:smenergy/services/energy_data_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class SetupStepTwoPage extends StatefulWidget {
@@ -18,6 +19,7 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
   final TextEditingController _passController = TextEditingController();
   final DeviceProvisioningService _provisioningService =
       DeviceProvisioningService();
+  final EnergyDataService _energyDataService = EnergyDataService();
 
   @override
   void dispose() {
@@ -53,10 +55,24 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
         return;
       }
 
+      _showMessage(
+        'Configuração enviada. À espera da primeira leitura do equipamento...',
+      );
+
+      final telemetryReady = await _energyDataService.waitForFirstTelemetry();
+      if (!mounted) return;
+
+      if (!telemetryReady) {
+        _showMessage(
+          'O equipamento recebeu a configuração, mas ainda não enviou leituras. Confirma o Wi-Fi 2.4 GHz, a alimentação e tenta novamente dentro de instantes.',
+        );
+        return;
+      }
+
       await ConfigService.setConfigStatus(1);
       if (!mounted) return;
 
-      _showMessage(result.message);
+      _showMessage('Equipamento ligado com sucesso e a enviar dados.');
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const DashboardPage()),
