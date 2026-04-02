@@ -469,6 +469,9 @@ class _HistoryPageState extends State<HistoryPage> {
                   if (index < 0 || index >= _chartLabels.length) {
                     return const SizedBox.shrink();
                   }
+                  if (!_shouldShowHistoryLabel(index)) {
+                    return const SizedBox.shrink();
+                  }
                   return Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
@@ -506,6 +509,16 @@ class _HistoryPageState extends State<HistoryPage> {
       return value.toStringAsFixed(2);
     }
     return value.toInt().toString();
+  }
+
+  bool _shouldShowHistoryLabel(int index) {
+    final count = _chartLabels.length;
+    if (count <= 6) {
+      return true;
+    }
+
+    final step = (count / 6).ceil();
+    return index == 0 || index == count - 1 || index % step == 0;
   }
 
   List<BarChartGroupData> _buildBarGroups(double barWidth) {

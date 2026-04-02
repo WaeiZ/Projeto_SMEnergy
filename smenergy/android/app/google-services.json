@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "15499243431-a1aidbh58c8cjeovfbl2e9rbjrjtcn70.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.smenergy",
+            "certificate_hash": "bbef7074f49353ae4d25afdd02e20389833887de"
+          }
+        },
+        {
           "client_id": "15499243431-drctk7jqcdkir2obtmma7ker6pf9rvev.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -30,6 +38,13 @@
             {
               "client_id": "15499243431-drctk7jqcdkir2obtmma7ker6pf9rvev.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "15499243431-h6dbndk1153llnuvcjhuh13ntngussq8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.smenergy"
+              }
             }
           ]
         }

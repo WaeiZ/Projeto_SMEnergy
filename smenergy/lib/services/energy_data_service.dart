@@ -12,6 +12,7 @@ class EnergySensorSnapshot {
     required this.limitWatts,
     required this.dailyKwh,
     required this.isOnline,
+    required this.lastReadingAt,
   });
 
   final String id;
@@ -20,6 +21,7 @@ class EnergySensorSnapshot {
   final double limitWatts;
   final double dailyKwh;
   final bool isOnline;
+  final DateTime? lastReadingAt;
 
   double get progress => (watts / limitWatts).clamp(0.0, 1.0).toDouble();
   bool get isAlert => watts > limitWatts;
@@ -469,7 +471,11 @@ class EnergyDataService {
       1.0,
       0.84,
     ];
-    final bucketKwTotals = List<double>.filled(bucketHours.length, 0);
+    final visibleBucketCount = min(
+      bucketHours.length,
+      (now.hour ~/ 3) + 1,
+    );
+    final bucketKwTotals = List<double>.filled(visibleBucketCount, 0);
 
     final sensorDocs = await deviceRef.collection('sensors').get();
     final sensors = <EnergySensorSnapshot>[];
@@ -502,11 +508,11 @@ class EnergyDataService {
       final lastReadingAt =
           latest?.timestamp ??
           _asDateTime(data['last_reading_at'] ?? data['updated_at']);
+      final hasFreshReading =
+          lastReadingAt != null &&
+          now.difference(lastReadingAt) <= const Duration(minutes: 10);
       final explicitOnline = data['is_online'];
-      final isOnline = explicitOnline is bool
-          ? explicitOnline
-          : (lastReadingAt != null &&
-                now.difference(lastReadingAt) <= const Duration(minutes: 15));
+      final isOnline = explicitOnline is bool ? explicitOnline : hasFreshReading;
 
       final hoursToday = max(1.0, now.difference(startOfDay).inMinutes / 60);
       final avgWattsToday = dayReadings.isEmpty
@@ -523,7 +529,7 @@ class EnergyDataService {
         final index = min(7, reading.timestamp.hour ~/ 3);
         sensorBucket[index].add(reading.watts);
       }
-      for (int i = 0; i < bucketKwTotals.length; i++) {
+      for (int i = 0; i < visibleBucketCount; i++) {
         final bucketKw = sensorBucket[i].count == 0
             ? (currentWatts / 1000) * fallbackMultiplier[i]
             : (sensorBucket[i].average / 1000);
@@ -538,13 +544,14 @@ class EnergyDataService {
           limitWatts: limitWatts,
           dailyKwh: double.parse(dailyKwh.toStringAsFixed(1)),
           isOnline: isOnline,
+          lastReadingAt: lastReadingAt,
         ),
       );
     }
 
     sensors.sort((a, b) => a.name.compareTo(b.name));
     final chartPoints = List.generate(
-      bucketHours.length,
+      visibleBucketCount,
       (i) => EnergyChartPoint(
         x: bucketHours[i].toDouble(),
         y: double.parse(bucketKwTotals[i].toStringAsFixed(2)),
@@ -706,7 +713,6 @@ class EnergyDataService {
       final sensorRef = deviceRef.collection('sensors').doc(sensor.id);
       batch.set(sensorRef, {
         'name': cleanName,
-        'sensor_name': cleanName,
         'limit_watts': safeLimit,
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -954,12 +960,26 @@ class EnergyDataService {
   ) async {
     final devicesRef = _db.collection('users').doc(uid).collection('devices');
     final snapshot = await devicesRef.get();
+    QueryDocumentSnapshot<Map<String, dynamic>>? bestDoc;
+    DateTime? bestTimestamp;
+
     for (final doc in snapshot.docs) {
       if (_isDataDocument(doc)) {
-        return doc.reference;
+        final data = doc.data();
+        final candidateTimestamp =
+            _asDateTime(
+              data['last_seen'] ?? data['updated_at'] ?? data['created_at'],
+            ) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+
+        if (bestDoc == null || candidateTimestamp.isAfter(bestTimestamp!)) {
+          bestDoc = doc;
+          bestTimestamp = candidateTimestamp;
+        }
       }
     }
-    return null;
+
+    return bestDoc?.reference;
   }
 
   bool _isDataDocument(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
@@ -1015,20 +1035,67 @@ class EnergyDataService {
     required DateTime start,
     required DateTime end,
   }) async {
-    final query = await sensorRef
-        .collection('readings')
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(end))
-        .orderBy('timestamp')
-        .get();
+    try {
+      final query = await sensorRef
+          .collection('readings')
+          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+          .where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(end))
+          .orderBy('timestamp')
+          .get();
 
-    final readings = <_ReadingSample>[];
-    for (final doc in query.docs) {
-      final reading = _toReadingSample(doc.data());
-      if (reading != null) {
-        readings.add(reading);
+      final readings = <_ReadingSample>[];
+      for (final doc in query.docs) {
+        final reading = _toReadingSample(doc.data());
+        if (reading != null) {
+          readings.add(reading);
+        }
       }
+
+      if (readings.isNotEmpty) {
+        return readings;
+      }
+    } catch (_) {
+      // Fallback below for documents whose timestamp is not stored as a
+      // Firestore Timestamp native type.
     }
+
+    try {
+      final snapshot = await sensorRef
+          .collection('readings')
+          .orderBy('timestamp')
+          .get();
+      return _filterReadingsInRange(snapshot.docs, start: start, end: end);
+    } catch (_) {
+      // keep fallback chain
+    }
+
+    try {
+      final snapshot = await sensorRef
+          .collection('readings')
+          .orderBy('created_at')
+          .get();
+      return _filterReadingsInRange(snapshot.docs, start: start, end: end);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  List<_ReadingSample> _filterReadingsInRange(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs, {
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final readings = <_ReadingSample>[];
+    for (final doc in docs) {
+      final reading = _toReadingSample(doc.data());
+      if (reading == null) continue;
+      if (reading.timestamp.isBefore(start) || reading.timestamp.isAfter(end)) {
+        continue;
+      }
+      readings.add(reading);
+    }
+
+    readings.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return readings;
   }
 

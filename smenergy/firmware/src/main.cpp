@@ -8,13 +8,15 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <PZEM004Tv30.h>
-#include <FirebaseESP32.h>
+
+#define FIREBASE_ENABLE_FIRESTORE
+#include <Firebase_ESP_Client.h>
 
 // --- FIREBASE (Firestore) ---
-#define FIREBASE_API_KEY "sua-api-key"
-#define FIREBASE_PROJECT_ID "seu-projeto-id"
-#define FIREBASE_USER_EMAIL "utilizador@dominio.com"
-#define FIREBASE_USER_PASSWORD "sua-password"
+#define FIREBASE_API_KEY "AIzaSyAKyEa3odhids7FTxO_6lutEET0yItJi_c"
+#define FIREBASE_PROJECT_ID "smenergy-14cc7"
+#define FIREBASE_USER_EMAIL "esp32@gmail.com"
+#define FIREBASE_USER_PASSWORD "12345678"
 
 // Opcional: UID default caso ainda não tenha sido enviado pela app.
 #define FIREBASE_OWNER_UID ""
@@ -30,7 +32,7 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define SENSOR_DEFAULT_LIMIT_WATTS 600.0
-#define SENSOR_LOOP_DELAY_MS 3000
+#define SENSOR_LOOP_DELAY_MS 60000
 #define RESET_CHECK_INTERVAL_MS 10000UL
 
 #define PREF_NAMESPACE "smenergy"
@@ -42,8 +44,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // Instâncias com endereços diferentes no mesmo barramento Serial2 (16, 17)
 PZEM004Tv30 pzem1(Serial2, 16, 17, 0x01);
-PZEM004Tv30 pzem2(Serial2, 16, 17, 0x02);
-PZEM004Tv30 pzem3(Serial2, 16, 17, 0x03);
+// PZEM004Tv30 pzem2(Serial2, 16, 17, 0x02);
+// PZEM004Tv30 pzem3(Serial2, 16, 17, 0x03);
 
 FirebaseData fbdo;
 FirebaseAuth auth;
@@ -73,13 +75,17 @@ struct SensorDef {
   const char *id;
   const char *name;
   int phase;
+  bool enabled;
 };
 
 SensorDef sensors[] = {
-  {&pzem1, "sensor_1", "Sensor 1", 1},
-  {&pzem2, "sensor_2", "Sensor 2", 2},
-  {&pzem3, "sensor_3", "Sensor 3", 3},
+  {&pzem1, "sensor_1", "Sensor 1", 1, false},
+  // {&pzem2, "sensor_2", "Sensor 2", 2, false},
+  // {&pzem3, "sensor_3", "Sensor 3", 3, false},
 };
+
+const size_t SENSOR_COUNT = sizeof(sensors) / sizeof(sensors[0]);
+size_t activeSensorCount = 0;
 
 String boolToJson(bool value) {
   return value ? "true" : "false";
@@ -116,11 +122,95 @@ String sensorReadingsCollectionPath(const char *sensorId) {
   return sensorDocPath(sensorId) + "/readings";
 }
 
+void showOledStatus(
+  const String &title,
+  const String &line1 = "",
+  const String &line2 = "",
+  const String &line3 = ""
+) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.println(title);
+  display.drawLine(0, 10, 128, 10, WHITE);
+  display.setCursor(0, 18);
+  if (line1.length() > 0) display.println(line1);
+  if (line2.length() > 0) display.println(line2);
+  if (line3.length() > 0) display.println(line3);
+  display.display();
+}
+
 void logFirebaseError(const char *context) {
   Serial.print("[Firebase] ");
   Serial.print(context);
   Serial.print(" -> ");
   Serial.println(fbdo.errorReason());
+}
+
+void syncClock() {
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+
+  Serial.print("A sincronizar relogio");
+  time_t now = time(nullptr);
+  int retries = 0;
+
+  while (now < 1700000000 && retries < 30) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+    retries++;
+  }
+
+  Serial.println();
+  if (now >= 1700000000) {
+    Serial.println("Relogio sincronizado.");
+  } else {
+    Serial.println("Falha ao sincronizar relogio.");
+    showOledStatus("SMEnergy", "Hora indisponivel", "Segue em frente");
+  }
+}
+
+bool sensorResponding(PZEM004Tv30 *pzem) {
+  for (int attempt = 0; attempt < 3; attempt++) {
+    float voltage = pzem->voltage();
+    float current = pzem->current();
+    float watts = pzem->power();
+
+    if (!isnan(voltage) || !isnan(current) || !isnan(watts)) {
+      return true;
+    }
+
+    delay(200);
+  }
+
+  return false;
+}
+
+void detectConnectedSensors() {
+  activeSensorCount = 0;
+
+  Serial.println("A detetar sensores PZEM...");
+  showOledStatus("SMEnergy", "Detetar sensores");
+  for (size_t i = 0; i < SENSOR_COUNT; i++) {
+    sensors[i].enabled = sensorResponding(sensors[i].pzem);
+    if (sensors[i].enabled) {
+      activeSensorCount++;
+      Serial.print("Sensor ativo detetado: ");
+      Serial.println(sensors[i].id);
+    } else {
+      Serial.print("Sensor ausente/inacessivel: ");
+      Serial.println(sensors[i].id);
+    }
+  }
+
+  Serial.print("Total de sensores ativos: ");
+  Serial.println(activeSensorCount);
+  showOledStatus(
+    "SMEnergy",
+    "Sensores detetados",
+    "Ativos: " + String(activeSensorCount),
+    activeSensorCount == 0 ? "Ligue o sensor" : "Sistema pronto"
+  );
 }
 
 void loadProvisioning() {
@@ -159,6 +249,12 @@ bool connectToWifi(const String &ssid, const String &password) {
     return false;
   }
 
+  showOledStatus("SMEnergy", "Ligar ao Wi-Fi", ssid);
+
+  WiFi.softAPdisconnect(true);
+  delay(200);
+  WiFi.disconnect(true, true);
+  delay(200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid.c_str(), password.c_str());
 
@@ -170,16 +266,37 @@ bool connectToWifi(const String &ssid, const String &password) {
   bool connected = WiFi.status() == WL_CONNECTED;
   Serial.print("WiFi status: ");
   Serial.println(connected ? "CONNECTED" : "FAILED");
+  if (connected) {
+    showOledStatus("SMEnergy", "Wi-Fi ligado", WiFi.localIP().toString());
+  } else {
+    showOledStatus("SMEnergy", "Falha no Wi-Fi", ssid, "Abrir modo AP");
+  }
   return connected;
 }
 
 void setupProvisioningServer() {
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP(WIFI_AP_NAME);
-
   if (serverStarted) {
+    Serial.print("Provisioning AP ativo: ");
+    Serial.println(WIFI_AP_NAME);
+    Serial.print("IP AP: ");
+    Serial.println(WiFi.softAPIP());
+    showOledStatus("Modo configuracao", WIFI_AP_NAME, WiFi.softAPIP().toString());
     return;
   }
+
+  WiFi.softAPdisconnect(true);
+  delay(200);
+  WiFi.disconnect(true, true);
+  delay(200);
+  WiFi.mode(WIFI_AP);
+  bool apStarted = WiFi.softAP(WIFI_AP_NAME, nullptr, 1, false, 4);
+
+  Serial.print("AP create result: ");
+  Serial.println(apStarted ? "OK" : "FAILED");
+  Serial.print("AP MAC: ");
+  Serial.println(WiFi.softAPmacAddress());
+  Serial.print("AP channel: ");
+  Serial.println(WiFi.channel());
 
   provisioningServer.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
     String payload = "{";
@@ -231,12 +348,20 @@ void setupProvisioningServer() {
   Serial.println(WIFI_AP_NAME);
   Serial.print("IP AP: ");
   Serial.println(WiFi.softAPIP());
+  showOledStatus(
+    "Modo configuracao",
+    "Ligue ao AP:",
+    WIFI_AP_NAME,
+    WiFi.softAPIP().toString()
+  );
 }
 
 void initFirebaseIfNeeded() {
   if (firebaseInitialized) {
     return;
   }
+
+  showOledStatus("SMEnergy", "Ligar Firebase");
 
   config.api_key = FIREBASE_API_KEY;
   auth.user.email = FIREBASE_USER_EMAIL;
@@ -245,6 +370,7 @@ void initFirebaseIfNeeded() {
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
   firebaseInitialized = true;
+  showOledStatus("SMEnergy", "Firebase pronto");
 }
 
 bool patchDocument(const String &path, FirebaseJson &content, const char *updateMask) {
@@ -286,12 +412,10 @@ void upsertSensorDoc(
   const String &timestampIso
 ) {
   FirebaseJson content;
-  content.set("fields/name/stringValue", sensor.name);
   content.set("fields/sensor_name/stringValue", sensor.name);
   content.set("fields/source/stringValue", "esp32_pzem");
   content.set("fields/placeholder/booleanValue", false);
   content.set("fields/phase/integerValue", sensor.phase);
-  content.set("fields/limit_watts/doubleValue", SENSOR_DEFAULT_LIMIT_WATTS);
   content.set("fields/current_watts/doubleValue", watts);
   content.set("fields/voltage/doubleValue", voltage);
   content.set("fields/current/doubleValue", current);
@@ -302,7 +426,7 @@ void upsertSensorDoc(
   patchDocument(
     sensorDocPath(sensor.id),
     content,
-    "name,sensor_name,source,placeholder,phase,limit_watts,current_watts,voltage,current,energy,is_online,last_reading_at"
+    "sensor_name,source,placeholder,phase,current_watts,voltage,current,energy,is_online,last_reading_at"
   );
 }
 
@@ -330,7 +454,8 @@ void addReading(
     FIRESTORE_DB_ID,
     sensorReadingsCollectionPath(sensor.id).c_str(),
     docId.c_str(),
-    content.raw()
+    content.raw(),
+    ""
   );
   if (!ok) {
     logFirebaseError("createDocument(reading)");
@@ -381,11 +506,13 @@ void processProvisioningRequestIfAny() {
     return;
   }
 
+  showOledStatus("SMEnergy", "Recebido setup", "A aplicar...");
   provisioningPending = false;
   saveProvisioning(pendingSSID, pendingPassword, pendingOwnerUID);
 
   bool connected = connectToWifi(configuredSSID, configuredPassword);
   if (connected) {
+    syncClock();
     initFirebaseIfNeeded();
     Serial.println("Provisioning concluído com sucesso.");
   } else {
@@ -404,6 +531,10 @@ void maintainWiFiConnection() {
     return;
   }
 
+  if (serverStarted) {
+    return;
+  }
+
   unsigned long nowMs = millis();
   if (nowMs - lastWifiRetryMs < WIFI_RETRY_INTERVAL_MS) {
     return;
@@ -413,6 +544,7 @@ void maintainWiFiConnection() {
   if (!connectToWifi(configuredSSID, configuredPassword)) {
     setupProvisioningServer();
   } else {
+    syncClock();
     initFirebaseIfNeeded();
   }
 }
@@ -464,14 +596,17 @@ void setup() {
     Serial.println("OLED Erro");
   }
   display.setTextColor(WHITE);
+  showOledStatus("SMEnergy", "A iniciar...");
 
   Serial2.begin(9600, SERIAL_8N1, 16, 17);
+  detectConnectedSensors();
 
   deviceID = buildDeviceId();
   loadProvisioning();
 
   bool connected = connectToWifi(configuredSSID, configuredPassword);
   if (connected) {
+    syncClock();
     initFirebaseIfNeeded();
   } else {
     setupProvisioningServer();
@@ -482,7 +617,21 @@ void loop() {
   processProvisioningRequestIfAny();
   maintainWiFiConnection();
 
-  for (size_t i = 0; i < (sizeof(sensors) / sizeof(sensors[0])); i++) {
+  if (activeSensorCount == 0) {
+    static unsigned long lastDetectMs = 0;
+    unsigned long nowMs = millis();
+    if (nowMs - lastDetectMs >= 5000UL) {
+      lastDetectMs = nowMs;
+      detectConnectedSensors();
+    }
+    delay(250);
+    return;
+  }
+
+  for (size_t i = 0; i < SENSOR_COUNT; i++) {
+    if (!sensors[i].enabled) {
+      continue;
+    }
     readAndPublish(sensors[i]);
     delay(SENSOR_LOOP_DELAY_MS);
   }

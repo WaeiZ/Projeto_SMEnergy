@@ -376,9 +376,9 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               Expanded(
                 child: _buildSensorMetricCard(
-                  label: 'Hoje',
-                  value: '${sensor.dailyKwh.toStringAsFixed(1)} kWh',
-                  icon: Icons.calendar_today_rounded,
+                  label: 'Ultima leitura',
+                  value: _formatLastReadingTime(sensor.lastReadingAt),
+                  icon: Icons.access_time_rounded,
                 ),
               ),
               const SizedBox(width: 10),
@@ -912,6 +912,16 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String _formatDashboardHourLabel(int hour) {
     return '${hour.toString().padLeft(2, '0')}h';
+  }
+
+  String _formatLastReadingTime(DateTime? value) {
+    if (value == null) {
+      return '--:--';
+    }
+
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 
   Widget _buildInfoCard({

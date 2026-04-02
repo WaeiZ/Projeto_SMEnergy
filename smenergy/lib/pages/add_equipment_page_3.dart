@@ -32,6 +32,33 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  Future<bool> _confirmPhoneHasInternetAgain() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Ligar novamente a Internet'),
+          content: const Text(
+            'A configuracao foi enviada para o equipamento. Agora volta a ligar o telemovel ao Wi-Fi da casa ou aos dados moveis e depois toca em Continuar.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Continuar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
   Future<void> _connectDevice() async {
     if (_isConnecting) return;
 
@@ -55,16 +82,17 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
         return;
       }
 
-      _showMessage(
-        'Configuração enviada. À espera da primeira leitura do equipamento...',
-      );
+      final canCheckFirestore = await _confirmPhoneHasInternetAgain();
+      if (!mounted || !canCheckFirestore) return;
+
+      _showMessage('A aguardar a primeira leitura do equipamento...');
 
       final telemetryReady = await _energyDataService.waitForFirstTelemetry();
       if (!mounted) return;
 
       if (!telemetryReady) {
         _showMessage(
-          'O equipamento recebeu a configuração, mas ainda não enviou leituras. Confirma o Wi-Fi 2.4 GHz, a alimentação e tenta novamente dentro de instantes.',
+          'O equipamento recebeu a configuracao, mas ainda nao enviou leituras. Confirma o Wi-Fi 2.4 GHz, a alimentacao e tenta novamente dentro de instantes.',
         );
         return;
       }
@@ -106,7 +134,7 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
               onPressed: () => Navigator.pop(context),
             ),
             const Text(
-              "2/2",
+              '2/2',
               style: TextStyle(
                 color: Colors.black,
                 fontSize: 16,
@@ -123,7 +151,7 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
           children: [
             const SizedBox(height: 20),
             const Text(
-              'Configuração Equipamento',
+              'Configuracao Equipamento',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -132,25 +160,19 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
             ),
             const SizedBox(height: 25),
             const Text(
-              '5. De volta à app, configure a rede Wi-Fi da casa',
+              '5. De volta a app, configure a rede Wi-Fi da casa',
               style: TextStyle(fontSize: 14, color: Colors.black87),
             ),
             const SizedBox(height: 30),
-
-            // INPUT SSID
             CustomPopOutInput(
-              controller:
-                  _ssidController, // Passando o controller para capturar o texto
+              controller: _ssidController,
               icon: Icons.wifi,
               hint: 'SSID',
               gradient: myGradient,
             ),
-
             const SizedBox(height: 20),
-
-            // INPUT PASSWORD
             CustomPopOutInput(
-              controller: _passController, // Passando o controller
+              controller: _passController,
               icon: Icons.wifi_lock_rounded,
               hint: 'Password',
               gradient: myGradient,
@@ -162,16 +184,13 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
                 });
               },
             ),
-
-            const SizedBox(height: 420),
-
+            const SizedBox(height: 220),
             CustomGradientButton(
               text: _isConnecting ? 'A conectar...' : 'Conectar',
               gradient: myGradient,
               onPressed: _isConnecting ? null : _connectDevice,
             ),
-
-            const SizedBox(height: 30),
+            const SizedBox(height: 18),
           ],
         ),
       ),
