@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:smenergy/pages/add_equipment_page.dart';
 import 'package:smenergy/pages/dashboard_page.dart';
 import 'package:smenergy/pages/register_page.dart';
@@ -97,8 +98,12 @@ class _LoginPageState extends State<LoginPage> {
       if (e.message != 'CANCELLED') {
         _mostrarMensagem(e.message);
       }
-    } catch (_) {
-      _mostrarMensagem('Erro ao entrar com Google.');
+    } on PlatformException catch (e) {
+      final message = (e.message ?? '').trim();
+      final suffix = message.isEmpty ? '' : ': $message';
+      _mostrarMensagem('Google Sign-In falhou (${e.code})$suffix');
+    } catch (e) {
+      _mostrarMensagem('Erro ao entrar com Google: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

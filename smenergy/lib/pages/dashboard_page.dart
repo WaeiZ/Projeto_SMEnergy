@@ -482,6 +482,7 @@ class _DashboardPageState extends State<DashboardPage> {
         spots.fold<double>(0, (acc, spot) => acc + spot.y) / spots.length;
     final latestKw = spots.last.y;
     final peakKw = highestValue;
+    final useWattsDisplay = peakKw < 1;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
@@ -529,7 +530,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               _buildChartHighlight(
                 label: 'Pico',
-                value: '${peakKw.toStringAsFixed(1)} kW',
+                value: _formatDashboardPower(peakKw),
               ),
             ],
           ),
@@ -564,7 +565,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       getTitlesWidget: (value, meta) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: Text(
-                          _formatChartAxis(value),
+                          _formatChartAxis(value, useWattsDisplay: useWattsDisplay),
                           style: const TextStyle(
                             color: Color(0xFF8C9BB5),
                             fontSize: 11,
@@ -621,7 +622,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     getTooltipItems: (touchedSpots) {
                       return touchedSpots.map((spot) {
                         return LineTooltipItem(
-                          '${_formatDashboardHourLabel(spot.x.toInt())}\n${spot.y.toStringAsFixed(1)} kW',
+                          '${_formatDashboardHourLabel(spot.x.toInt())}\n${_formatDashboardPower(spot.y)}',
                           const TextStyle(
                             color: Colors.white,
                             fontSize: 11,
@@ -676,14 +677,14 @@ class _DashboardPageState extends State<DashboardPage> {
               Expanded(
                 child: _buildChartFooterMetric(
                   label: 'Agora',
-                  value: '${latestKw.toStringAsFixed(1)} kW',
+                  value: _formatDashboardPower(latestKw),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildChartFooterMetric(
                   label: 'Média',
-                  value: '${averageKw.toStringAsFixed(1)} kW',
+                  value: _formatDashboardPower(averageKw),
                 ),
               ),
             ],
@@ -885,13 +886,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   double _computeChartMaxY(double highestValue) {
-    final interval = _computeChartInterval(max(highestValue, 0.5));
-    return max(interval * 4, (highestValue / interval).ceil() * interval);
+    final interval = _computeChartInterval(max(highestValue, 0.01));
+    final roundedTop = ((highestValue / interval).ceil().clamp(1, 9999)) * interval;
+    return max(interval * 4, roundedTop.toDouble());
   }
 
   double _computeChartInterval(double highestValue) {
-    const candidates = <double>[0.25, 0.5, 1, 2, 5, 10, 20];
-    final raw = max(0.25, highestValue / 4);
+    const candidates = <double>[0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20];
+    final raw = max(0.01, highestValue / 4);
     for (final candidate in candidates) {
       if (raw <= candidate) {
         return candidate;
@@ -900,7 +902,16 @@ class _DashboardPageState extends State<DashboardPage> {
     return (raw / 5).ceil() * 5;
   }
 
-  String _formatChartAxis(double value) {
+  String _formatChartAxis(double value, {bool useWattsDisplay = false}) {
+    if (useWattsDisplay) {
+      return (value * 1000).toStringAsFixed(0);
+    }
+    if (value < 0.1) {
+      return value.toStringAsFixed(2);
+    }
+    if (value < 1) {
+      return value.toStringAsFixed(1);
+    }
     if (value >= 10) {
       return value.toStringAsFixed(0);
     }
@@ -912,6 +923,13 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String _formatDashboardHourLabel(int hour) {
     return '${hour.toString().padLeft(2, '0')}h';
+  }
+
+  String _formatDashboardPower(double valueKw) {
+    if (valueKw < 1) {
+      return '${(valueKw * 1000).toStringAsFixed(0)} W';
+    }
+    return '${valueKw.toStringAsFixed(1)} kW';
   }
 
   String _formatLastReadingTime(DateTime? value) {

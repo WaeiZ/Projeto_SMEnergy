@@ -19,7 +19,7 @@ class AccSettPage extends StatefulWidget {
 class _AccSettPageState extends State<AccSettPage> {
   int _selectedIndex = 3;
   final TextEditingController _nameController =
-      TextEditingController(text: 'Sérgio Dias');
+      TextEditingController(text: 'Sergio Dias');
   final AuthService _authService = AuthService();
   bool _isMfaLoading = false;
   bool _isDeleteLoading = false;
@@ -104,7 +104,7 @@ class _AccSettPageState extends State<AccSettPage> {
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Eliminar conta'),
-          content: const Text('Tens a certeza? Esta ação é permanente.'),
+          content: const Text('Tens a certeza? Esta acao e permanente.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
@@ -141,7 +141,7 @@ class _AccSettPageState extends State<AccSettPage> {
       switch (e.code) {
         case 'requires-recent-login':
           _showMessage(
-            'Por segurança, termina sessão e entra novamente para eliminar a conta.',
+            'Por seguranca, termina sessao e entra novamente para eliminar a conta.',
           );
           break;
         default:
@@ -191,18 +191,18 @@ class _AccSettPageState extends State<AccSettPage> {
     await FirebaseAuth.instance.currentUser?.reload();
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showMessage('Sessão inválida. Faz login novamente.');
+      _showMessage('Sessao invalida. Faz login novamente.');
       return;
     }
 
     final factors = await user.multiFactor.getEnrolledFactors();
     if (factors.isNotEmpty) {
-      _showMessage('MFA já está ativo.', isError: false);
+      _showMessage('MFA ja esta ativo.', isError: false);
       return;
     }
 
     final phoneNumber = await _promptForInput(
-      title: 'Número de telemóvel',
+      title: 'Numero de telemovel',
       hint: '+351 9xx xxx xxx',
       keyboardType: TextInputType.phone,
     );
@@ -214,7 +214,7 @@ class _AccSettPageState extends State<AccSettPage> {
       await _authService.enrollPhoneMfa(
         phoneNumber: phoneNumber,
         getSmsCode: () => _promptForInput(
-          title: 'Código SMS',
+          title: 'Codigo SMS',
           hint: 'Ex: 123456',
           keyboardType: TextInputType.number,
         ),
@@ -222,7 +222,7 @@ class _AccSettPageState extends State<AccSettPage> {
       _showMessage('MFA ativado com sucesso.', isError: false);
       if (user.email != null && !user.emailVerified) {
         _showMessage(
-          'Foi enviado um email de verificação. Confirma o email depois.',
+          'Foi enviado um email de verificacao. Confirma o email depois.',
           isError: false,
         );
       }
@@ -244,13 +244,13 @@ class _AccSettPageState extends State<AccSettPage> {
   String _mapMfaError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-phone-number':
-        return 'Número de telemóvel inválido';
+        return 'Numero de telemovel invalido';
       case 'missing-phone-number':
-        return 'Indica um número de telemóvel';
+        return 'Indica um numero de telemovel';
       case 'too-many-requests':
         return 'Muitos pedidos. Tenta mais tarde.';
       case 'requires-recent-login':
-        return 'Por segurança, termina sessão e entra novamente para ativar MFA.';
+        return 'Por seguranca, termina sessao e entra novamente para ativar MFA.';
       default:
         return 'Falha ao ativar MFA. Tenta novamente.';
     }
@@ -276,7 +276,7 @@ class _AccSettPageState extends State<AccSettPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Definições da conta',
+          'Definicoes da conta',
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -335,8 +335,7 @@ class _AccSettPageState extends State<AccSettPage> {
               const SizedBox(height: 16),
             ],
             CustomGradientButton(
-              text:
-                  _isMfaLoading ? 'A ativar MFA...' : 'Ativar MFA por Telemóvel',
+              text: _isMfaLoading ? 'A ativar MFA...' : 'Ativar MFA',
               gradient: myGradient,
               onPressed: _enableMfa,
             ),
@@ -401,7 +400,7 @@ class _AccSettPageState extends State<AccSettPage> {
         },
         items: [
           _navItem(Icons.grid_view_rounded, 'Dashboard', 0),
-          _navItem(Icons.bar_chart_rounded, 'Histórico', 1),
+          _navItem(Icons.bar_chart_rounded, 'Historico', 1),
           _navItem(Icons.warning_amber_rounded, 'Alertas', 2),
           _navItem(Icons.person_outline, 'Perfil', 3),
         ],

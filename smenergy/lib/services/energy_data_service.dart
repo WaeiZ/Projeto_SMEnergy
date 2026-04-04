@@ -510,9 +510,9 @@ class EnergyDataService {
           _asDateTime(data['last_reading_at'] ?? data['updated_at']);
       final hasFreshReading =
           lastReadingAt != null &&
-          now.difference(lastReadingAt) <= const Duration(minutes: 10);
+          now.difference(lastReadingAt) <= const Duration(seconds: 90);
       final explicitOnline = data['is_online'];
-      final isOnline = explicitOnline is bool ? explicitOnline : hasFreshReading;
+      final isOnline = explicitOnline == false ? false : hasFreshReading;
 
       final hoursToday = max(1.0, now.difference(startOfDay).inMinutes / 60);
       final avgWattsToday = dayReadings.isEmpty
@@ -554,7 +554,7 @@ class EnergyDataService {
       visibleBucketCount,
       (i) => EnergyChartPoint(
         x: bucketHours[i].toDouble(),
-        y: double.parse(bucketKwTotals[i].toStringAsFixed(2)),
+        y: bucketKwTotals[i],
       ),
     );
     final totalDayKwh = sensors.fold<double>(
@@ -734,11 +734,39 @@ class EnergyDataService {
 
     await deviceRef.set({
       'command': 'reset',
-      'placeholder': true,
       'is_online': false,
       'unpaired_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    await Future<void>.delayed(const Duration(seconds: 2));
+
+    final sensorsRef = deviceRef.collection('sensors');
+    final sensorsSnapshot = await sensorsRef.get();
+    for (final sensorDoc in sensorsSnapshot.docs) {
+      await _deleteCollection(sensorDoc.reference.collection('readings'));
+    }
+
+    await _deleteCollection(sensorsRef);
+    await deviceRef.delete();
+  }
+
+  Future<void> _deleteCollection(
+    CollectionReference<Map<String, dynamic>> collection, {
+    int batchSize = 100,
+  }) async {
+    while (true) {
+      final snapshot = await collection.limit(batchSize).get();
+      if (snapshot.docs.isEmpty) {
+        break;
+      }
+
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
   }
 
   Future<EnergyHistoryData> fetchHistory({
@@ -815,27 +843,6 @@ class EnergyDataService {
         ),
       );
       cursor = cursor.add(const Duration(days: 1));
-    }
-
-    if (labels.length > 8) {
-      final compactData = _aggregateHistoryByBuckets(
-        byDay,
-        start: start,
-        end: endDay,
-        measure: measure,
-      );
-      return EnergyHistoryData(
-        labels: compactData.labels,
-        values: compactData.values,
-        averageWatts: double.parse(averageWatts.toStringAsFixed(1)),
-        maxWatts: double.parse(maxWatts.toStringAsFixed(1)),
-        minWatts: double.parse(minWatts.toStringAsFixed(1)),
-        totalKwh: double.parse(totalKwh.toStringAsFixed(2)),
-        sampleCount: sampleCount,
-        estimatedCostEur: double.parse(estimatedCostEur.toStringAsFixed(2)),
-        costConfigured: costConfigured,
-        contractLabel: profile.contractType.label,
-      );
     }
 
     return EnergyHistoryData(
@@ -1392,13 +1399,15 @@ class EnergyDataService {
   }
 
   DateTime? _asDateTime(dynamic value) {
-    if (value is Timestamp) return value.toDate();
-    if (value is DateTime) return value;
+    if (value is Timestamp) return value.toDate().toLocal();
+    if (value is DateTime) return value.isUtc ? value.toLocal() : value;
     if (value is int) {
-      return DateTime.fromMillisecondsSinceEpoch(value);
+      return DateTime.fromMillisecondsSinceEpoch(value).toLocal();
     }
     if (value is String) {
-      return DateTime.tryParse(value);
+      final parsed = DateTime.tryParse(value);
+      if (parsed == null) return null;
+      return parsed.isUtc ? parsed.toLocal() : parsed;
     }
     return null;
   }

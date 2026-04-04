@@ -389,6 +389,10 @@ class _HistoryPageState extends State<HistoryPage> {
         ? max(0.25, maxY / 4)
         : max(20.0, (maxY / 4).ceilToDouble());
     final barWidth = _chartValues.length <= 6 ? 18.0 : 16.0;
+    final chartWidth = max(
+      MediaQuery.of(context).size.width - 72,
+      _chartValues.length * 52.0,
+    );
 
     return Container(
       height: 230,
@@ -398,98 +402,101 @@ class _HistoryPageState extends State<HistoryPage> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE3F0FE)),
       ),
-      child: BarChart(
-        BarChartData(
-          minY: 0,
-          maxY: maxY,
-          alignment: BarChartAlignment.spaceAround,
-          barTouchData: BarTouchData(
-            enabled: true,
-            handleBuiltInTouches: true,
-            touchTooltipData: BarTouchTooltipData(
-              tooltipPadding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 6,
-              ),
-              tooltipMargin: 8,
-              getTooltipColor: (_) => const Color(0xFF1E2A3A),
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final index = group.x;
-                if (index < 0 || index >= _chartLabels.length) {
-                  return null;
-                }
-                return BarTooltipItem(
-                  '${_chartLabels[index]}\n${_formatMeasureValue(rod.toY)}',
-                  const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: chartWidth,
+          child: BarChart(
+            BarChartData(
+              minY: 0,
+              maxY: maxY,
+              alignment: BarChartAlignment.spaceAround,
+              barTouchData: BarTouchData(
+                enabled: true,
+                handleBuiltInTouches: true,
+                touchTooltipData: BarTouchTooltipData(
+                  tooltipPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
                   ),
-                );
-              },
-            ),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: interval,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.grey[300]!,
-              strokeWidth: 1,
-              dashArray: [5, 5],
-            ),
-          ),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: interval,
-                reservedSize: 32,
-                getTitlesWidget: (value, meta) => Text(
-                  _formatAxisValue(value),
-                  style: const TextStyle(
-                    color: Color(0xFF8C9BB5),
-                    fontSize: 12,
+                  tooltipMargin: 8,
+                  getTooltipColor: (_) => const Color(0xFF1E2A3A),
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final index = group.x;
+                    if (index < 0 || index >= _chartLabels.length) {
+                      return null;
+                    }
+                    return BarTooltipItem(
+                      '${_chartLabels[index]}\n${_formatMeasureValue(rod.toY)}',
+                      const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: interval,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey[300]!,
+                  strokeWidth: 1,
+                  dashArray: [5, 5],
+                ),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: interval,
+                    reservedSize: 32,
+                    getTitlesWidget: (value, meta) => Text(
+                      _formatAxisValue(value),
+                      style: const TextStyle(
+                        color: Color(0xFF8C9BB5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index < 0 || index >= _chartLabels.length) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          _chartLabels[index],
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF8C9BB5),
+                            fontSize: 10,
+                            height: 1.1,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40,
-                getTitlesWidget: (value, meta) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= _chartLabels.length) {
-                    return const SizedBox.shrink();
-                  }
-                  if (!_shouldShowHistoryLabel(index)) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      _chartLabels[index],
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFF8C9BB5),
-                        fontSize: 10,
-                        height: 1.1,
-                      ),
-                    ),
-                  );
-                },
-              ),
+              borderData: FlBorderData(show: false),
+              barGroups: _buildBarGroups(barWidth),
             ),
           ),
-          borderData: FlBorderData(show: false),
-          barGroups: _buildBarGroups(barWidth),
         ),
       ),
     );
@@ -509,16 +516,6 @@ class _HistoryPageState extends State<HistoryPage> {
       return value.toStringAsFixed(2);
     }
     return value.toInt().toString();
-  }
-
-  bool _shouldShowHistoryLabel(int index) {
-    final count = _chartLabels.length;
-    if (count <= 6) {
-      return true;
-    }
-
-    final step = (count / 6).ceil();
-    return index == 0 || index == count - 1 || index % step == 0;
   }
 
   List<BarChartGroupData> _buildBarGroups(double barWidth) {
