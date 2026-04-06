@@ -5,14 +5,16 @@ import 'package:smenergy/services/auth_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  const RegisterPage({super.key, AuthServiceBase? authService})
+    : authService = authService ?? const _DefaultAuthServiceProxy();
+
+  final AuthServiceBase authService;
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final AuthService _authService = AuthService();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _nomeController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
@@ -24,8 +26,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final RegExp _hasUpper = RegExp(r'[A-Z]');
   final RegExp _hasLower = RegExp(r'[a-z]');
   final RegExp _hasDigit = RegExp(r'\d');
-  final RegExp _hasSpecial =
-      RegExp(r"[!@#$%^&*(),.?{}|<>_\-\\/\[\];'`~+=]");
+  final RegExp _hasSpecial = RegExp(r"[!@#$%^&*(),.?{}|<>_\-\\/\[\];'`~+=]");
 
   @override
   void dispose() {
@@ -45,7 +46,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final confirmPass = _confirmPassController.text;
 
     if (email.isEmpty || nome.isEmpty || pass.isEmpty || confirmPass.isEmpty) {
-      _mostrarMensagem("Preencha todos os campos");
+      _mostrarMensagem('Preencha todos os campos');
       return;
     }
 
@@ -56,18 +57,14 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     if (pass != confirmPass) {
-      _mostrarMensagem("As passwords não coincidem");
+      _mostrarMensagem('As passwords não coincidem');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signUp(
-        name: nome,
-        email: email,
-        password: pass,
-      );
+      await widget.authService.signUp(name: nome, email: email, password: pass);
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
@@ -87,10 +84,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _mostrarMensagem(String texto) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(texto),
-        backgroundColor: Colors.redAccent,
-      ),
+      SnackBar(content: Text(texto), backgroundColor: Colors.redAccent),
     );
   }
 
@@ -136,7 +130,11 @@ class _RegisterPageState extends State<RegisterPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.black,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -213,4 +211,58 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
     );
   }
+}
+
+class _DefaultAuthServiceProxy implements AuthServiceBase {
+  const _DefaultAuthServiceProxy();
+
+  AuthService get _service => AuthService();
+
+  @override
+  Future<void> deleteAccountAndData() => _service.deleteAccountAndData();
+
+  @override
+  Future<void> enrollPhoneMfa({
+    required String phoneNumber,
+    required Future<String?> Function() getSmsCode,
+  }) =>
+      _service.enrollPhoneMfa(phoneNumber: phoneNumber, getSmsCode: getSmsCode);
+
+  @override
+  Future<bool> hasEquipmentForCurrentUser() =>
+      _service.hasEquipmentForCurrentUser();
+
+  @override
+  Future<void> resolveSignInWithSmsMfa({
+    required FirebaseAuthMultiFactorException exception,
+    required Future<String?> Function() getSmsCode,
+  }) => _service.resolveSignInWithSmsMfa(
+    exception: exception,
+    getSmsCode: getSmsCode,
+  );
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) =>
+      _service.sendPasswordResetEmail(email: email);
+
+  @override
+  Future<void> signIn({required String email, required String password}) =>
+      _service.signIn(email: email, password: password);
+
+  @override
+  Future<void> signInWithGoogle() => _service.signInWithGoogle();
+
+  @override
+  Future<void> signOut() => _service.signOut();
+
+  @override
+  Future<void> signUp({
+    required String name,
+    required String email,
+    required String password,
+  }) => _service.signUp(name: name, email: email, password: password);
+
+  @override
+  Future<void> updateUserName({required String name}) =>
+      _service.updateUserName(name: name);
 }

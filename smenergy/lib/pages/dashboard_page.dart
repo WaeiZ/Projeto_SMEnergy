@@ -8,7 +8,11 @@ import 'package:smenergy/pages/profile_page.dart';
 import 'package:smenergy/services/energy_data_service.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  const DashboardPage({super.key, EnergyDataServiceBase? energyDataService})
+    : energyDataService =
+          energyDataService ?? const _DefaultEnergyDataServiceProxy();
+
+  final EnergyDataServiceBase energyDataService;
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -19,13 +23,12 @@ class _DashboardPageState extends State<DashboardPage> {
   int _currentSensorIndex = 0;
 
   final PageController _pageController = PageController();
-  final EnergyDataService _energyDataService = EnergyDataService();
   late final Stream<EnergyDashboardData> _dashboardStream;
 
   @override
   void initState() {
     super.initState();
-    _dashboardStream = _energyDataService.streamDashboardData();
+    _dashboardStream = widget.energyDataService.streamDashboardData();
   }
 
   @override
@@ -565,7 +568,10 @@ class _DashboardPageState extends State<DashboardPage> {
                       getTitlesWidget: (value, meta) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: Text(
-                          _formatChartAxis(value, useWattsDisplay: useWattsDisplay),
+                          _formatChartAxis(
+                            value,
+                            useWattsDisplay: useWattsDisplay,
+                          ),
                           style: const TextStyle(
                             color: Color(0xFF8C9BB5),
                             fontSize: 11,
@@ -887,12 +893,25 @@ class _DashboardPageState extends State<DashboardPage> {
 
   double _computeChartMaxY(double highestValue) {
     final interval = _computeChartInterval(max(highestValue, 0.01));
-    final roundedTop = ((highestValue / interval).ceil().clamp(1, 9999)) * interval;
+    final roundedTop =
+        ((highestValue / interval).ceil().clamp(1, 9999)) * interval;
     return max(interval * 4, roundedTop.toDouble());
   }
 
   double _computeChartInterval(double highestValue) {
-    const candidates = <double>[0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20];
+    const candidates = <double>[
+      0.01,
+      0.02,
+      0.05,
+      0.1,
+      0.25,
+      0.5,
+      1,
+      2,
+      5,
+      10,
+      20,
+    ];
     final raw = max(0.01, highestValue / 4);
     for (final candidate in candidates) {
       if (raw <= candidate) {
@@ -1086,4 +1105,73 @@ class _DashboardPageState extends State<DashboardPage> {
       label: label,
     );
   }
+}
+
+class _DefaultEnergyDataServiceProxy implements EnergyDataServiceBase {
+  const _DefaultEnergyDataServiceProxy();
+
+  EnergyDataService get _service => EnergyDataService();
+
+  @override
+  Future<GamificationProfile> addGamificationPoints(int rewardPoints) =>
+      _service.addGamificationPoints(rewardPoints);
+
+  @override
+  Future<ElectricityCostProfile> fetchElectricityCostProfile() =>
+      _service.fetchElectricityCostProfile();
+
+  @override
+  Future<GamificationProfile> fetchGamificationProfile() =>
+      _service.fetchGamificationProfile();
+
+  @override
+  Future<EnergyHistoryData> fetchHistory({
+    required String sensorId,
+    required String measure,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) => _service.fetchHistory(
+    sensorId: sensorId,
+    measure: measure,
+    startDate: startDate,
+    endDate: endDate,
+  );
+
+  @override
+  Future<List<EnergySensorOption>> fetchSensors() => _service.fetchSensors();
+
+  @override
+  Future<List<EnergySensorSettings>> fetchSensorSettings() =>
+      _service.fetchSensorSettings();
+
+  @override
+  Future<void> saveElectricityCostProfile(ElectricityCostProfile profile) =>
+      _service.saveElectricityCostProfile(profile);
+
+  @override
+  Stream<EnergyAlertData> streamAlertData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamAlertData(interval: interval);
+
+  @override
+  Stream<EnergyDashboardData> streamDashboardData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamDashboardData(interval: interval);
+
+  @override
+  Future<void> unpairActiveDeviceAndRequestReset() =>
+      _service.unpairActiveDeviceAndRequestReset();
+
+  @override
+  Future<void> updateSensorSettings(List<EnergySensorSettings> settings) =>
+      _service.updateSensorSettings(settings);
+
+  @override
+  Future<bool> waitForFirstTelemetry({
+    Duration timeout = const Duration(seconds: 75),
+    Duration pollInterval = const Duration(seconds: 5),
+  }) => _service.waitForFirstTelemetry(
+    timeout: timeout,
+    pollInterval: pollInterval,
+  );
 }

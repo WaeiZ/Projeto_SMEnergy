@@ -3,7 +3,13 @@ import 'package:smenergy/services/energy_data_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class ElectricitySettingsPage extends StatefulWidget {
-  const ElectricitySettingsPage({super.key});
+  const ElectricitySettingsPage({
+    super.key,
+    EnergyDataServiceBase? energyDataService,
+  }) : energyDataService =
+           energyDataService ?? const _DefaultEnergyDataServiceProxy();
+
+  final EnergyDataServiceBase energyDataService;
 
   @override
   State<ElectricitySettingsPage> createState() =>
@@ -11,8 +17,6 @@ class ElectricitySettingsPage extends StatefulWidget {
 }
 
 class _ElectricitySettingsPageState extends State<ElectricitySettingsPage> {
-  final EnergyDataService _energyDataService = EnergyDataService();
-
   final TextEditingController _monthlyConsumptionController =
       TextEditingController();
   final TextEditingController _simpleTariffController = TextEditingController();
@@ -62,7 +66,8 @@ class _ElectricitySettingsPageState extends State<ElectricitySettingsPage> {
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await _energyDataService.fetchElectricityCostProfile();
+      final profile = await widget.energyDataService
+          .fetchElectricityCostProfile();
       if (!mounted) return;
 
       setState(() {
@@ -133,7 +138,7 @@ class _ElectricitySettingsPageState extends State<ElectricitySettingsPage> {
 
     setState(() => _isSaving = true);
     try {
-      await _energyDataService.saveElectricityCostProfile(profile);
+      await widget.energyDataService.saveElectricityCostProfile(profile);
       if (!mounted) return;
       _showSnackBar('Definições de eletricidade guardadas.');
       Navigator.pop(context, true);
@@ -589,4 +594,73 @@ class _ElectricitySettingsPageState extends State<ElectricitySettingsPage> {
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
+}
+
+class _DefaultEnergyDataServiceProxy implements EnergyDataServiceBase {
+  const _DefaultEnergyDataServiceProxy();
+
+  EnergyDataService get _service => EnergyDataService();
+
+  @override
+  Future<GamificationProfile> addGamificationPoints(int rewardPoints) =>
+      _service.addGamificationPoints(rewardPoints);
+
+  @override
+  Future<ElectricityCostProfile> fetchElectricityCostProfile() =>
+      _service.fetchElectricityCostProfile();
+
+  @override
+  Future<GamificationProfile> fetchGamificationProfile() =>
+      _service.fetchGamificationProfile();
+
+  @override
+  Future<EnergyHistoryData> fetchHistory({
+    required String sensorId,
+    required String measure,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) => _service.fetchHistory(
+    sensorId: sensorId,
+    measure: measure,
+    startDate: startDate,
+    endDate: endDate,
+  );
+
+  @override
+  Future<List<EnergySensorOption>> fetchSensors() => _service.fetchSensors();
+
+  @override
+  Future<List<EnergySensorSettings>> fetchSensorSettings() =>
+      _service.fetchSensorSettings();
+
+  @override
+  Future<void> saveElectricityCostProfile(ElectricityCostProfile profile) =>
+      _service.saveElectricityCostProfile(profile);
+
+  @override
+  Stream<EnergyAlertData> streamAlertData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamAlertData(interval: interval);
+
+  @override
+  Stream<EnergyDashboardData> streamDashboardData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamDashboardData(interval: interval);
+
+  @override
+  Future<void> unpairActiveDeviceAndRequestReset() =>
+      _service.unpairActiveDeviceAndRequestReset();
+
+  @override
+  Future<void> updateSensorSettings(List<EnergySensorSettings> settings) =>
+      _service.updateSensorSettings(settings);
+
+  @override
+  Future<bool> waitForFirstTelemetry({
+    Duration timeout = const Duration(seconds: 75),
+    Duration pollInterval = const Duration(seconds: 5),
+  }) => _service.waitForFirstTelemetry(
+    timeout: timeout,
+    pollInterval: pollInterval,
+  );
 }

@@ -6,7 +6,23 @@ import 'package:smenergy/services/energy_data_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class SetupStepTwoPage extends StatefulWidget {
-  const SetupStepTwoPage({super.key});
+  const SetupStepTwoPage({
+    super.key,
+    DeviceProvisioningServiceBase? provisioningService,
+    EnergyDataServiceBase? energyDataService,
+    Future<void> Function(int status)? setConfigStatus,
+    this.successPageBuilder,
+  }) : provisioningService =
+           provisioningService ??
+           const _DefaultDeviceProvisioningServiceProxy(),
+       energyDataService =
+           energyDataService ?? const _DefaultEnergyDataServiceProxy(),
+       setConfigStatus = setConfigStatus ?? ConfigService.setConfigStatus;
+
+  final DeviceProvisioningServiceBase provisioningService;
+  final EnergyDataServiceBase energyDataService;
+  final Future<void> Function(int status) setConfigStatus;
+  final WidgetBuilder? successPageBuilder;
 
   @override
   State<SetupStepTwoPage> createState() => _SetupStepTwoPageState();
@@ -17,10 +33,6 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
   bool _isConnecting = false;
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
-  final DeviceProvisioningService _provisioningService =
-      DeviceProvisioningService();
-  final EnergyDataService _energyDataService = EnergyDataService();
-
   @override
   void dispose() {
     _ssidController.dispose();
@@ -71,7 +83,7 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
 
     setState(() => _isConnecting = true);
     try {
-      final result = await _provisioningService.provisionDevice(
+      final result = await widget.provisioningService.provisionDevice(
         ssid: ssid,
         password: password,
       );
@@ -87,7 +99,8 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
 
       _showMessage('A aguardar a primeira leitura do equipamento...');
 
-      final telemetryReady = await _energyDataService.waitForFirstTelemetry();
+      final telemetryReady = await widget.energyDataService
+          .waitForFirstTelemetry();
       if (!mounted) return;
 
       if (!telemetryReady) {
@@ -97,13 +110,16 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
         return;
       }
 
-      await ConfigService.setConfigStatus(1);
+      await widget.setConfigStatus(1);
       if (!mounted) return;
 
       _showMessage('Equipamento ligado com sucesso e a enviar dados.');
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const DashboardPage()),
+        MaterialPageRoute(
+          builder:
+              widget.successPageBuilder ?? (context) => const DashboardPage(),
+        ),
         (route) => false,
       );
     } finally {
@@ -196,4 +212,90 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
       ),
     );
   }
+}
+
+class _DefaultDeviceProvisioningServiceProxy
+    implements DeviceProvisioningServiceBase {
+  const _DefaultDeviceProvisioningServiceProxy();
+
+  DeviceProvisioningService get _service => DeviceProvisioningService();
+
+  @override
+  Future<bool> isProvisioningDeviceReachable() =>
+      _service.isProvisioningDeviceReachable();
+
+  @override
+  Future<DeviceProvisioningResult> provisionDevice({
+    required String ssid,
+    required String password,
+  }) => _service.provisionDevice(ssid: ssid, password: password);
+}
+
+class _DefaultEnergyDataServiceProxy implements EnergyDataServiceBase {
+  const _DefaultEnergyDataServiceProxy();
+
+  EnergyDataService get _service => EnergyDataService();
+
+  @override
+  Future<GamificationProfile> addGamificationPoints(int rewardPoints) =>
+      _service.addGamificationPoints(rewardPoints);
+
+  @override
+  Future<ElectricityCostProfile> fetchElectricityCostProfile() =>
+      _service.fetchElectricityCostProfile();
+
+  @override
+  Future<GamificationProfile> fetchGamificationProfile() =>
+      _service.fetchGamificationProfile();
+
+  @override
+  Future<EnergyHistoryData> fetchHistory({
+    required String sensorId,
+    required String measure,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) => _service.fetchHistory(
+    sensorId: sensorId,
+    measure: measure,
+    startDate: startDate,
+    endDate: endDate,
+  );
+
+  @override
+  Future<List<EnergySensorOption>> fetchSensors() => _service.fetchSensors();
+
+  @override
+  Future<List<EnergySensorSettings>> fetchSensorSettings() =>
+      _service.fetchSensorSettings();
+
+  @override
+  Future<void> saveElectricityCostProfile(ElectricityCostProfile profile) =>
+      _service.saveElectricityCostProfile(profile);
+
+  @override
+  Stream<EnergyAlertData> streamAlertData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamAlertData(interval: interval);
+
+  @override
+  Stream<EnergyDashboardData> streamDashboardData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamDashboardData(interval: interval);
+
+  @override
+  Future<void> unpairActiveDeviceAndRequestReset() =>
+      _service.unpairActiveDeviceAndRequestReset();
+
+  @override
+  Future<void> updateSensorSettings(List<EnergySensorSettings> settings) =>
+      _service.updateSensorSettings(settings);
+
+  @override
+  Future<bool> waitForFirstTelemetry({
+    Duration timeout = const Duration(seconds: 75),
+    Duration pollInterval = const Duration(seconds: 5),
+  }) => _service.waitForFirstTelemetry(
+    timeout: timeout,
+    pollInterval: pollInterval,
+  );
 }

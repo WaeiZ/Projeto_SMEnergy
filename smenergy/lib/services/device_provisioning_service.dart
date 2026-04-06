@@ -14,11 +14,21 @@ class DeviceProvisioningResult {
   final String message;
 }
 
-class DeviceProvisioningService {
+abstract class DeviceProvisioningServiceBase {
+  Future<bool> isProvisioningDeviceReachable();
+
+  Future<DeviceProvisioningResult> provisionDevice({
+    required String ssid,
+    required String password,
+  });
+}
+
+class DeviceProvisioningService implements DeviceProvisioningServiceBase {
   static const String _deviceHost = '192.168.4.1';
   static const Duration _requestTimeout = Duration(seconds: 20);
   static const Duration _statusTimeout = Duration(seconds: 4);
 
+  @override
   Future<bool> isProvisioningDeviceReachable() async {
     final uri = Uri.parse('http://$_deviceHost/status');
     try {
@@ -29,6 +39,7 @@ class DeviceProvisioningService {
     }
   }
 
+  @override
   Future<DeviceProvisioningResult> provisionDevice({
     required String ssid,
     required String password,

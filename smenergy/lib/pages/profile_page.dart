@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/acc_sett_page.dart';
@@ -12,7 +13,16 @@ import 'package:smenergy/services/energy_data_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({
+    super.key,
+    AuthServiceBase? authService,
+    EnergyDataServiceBase? energyDataService,
+  }) : authService = authService ?? const _DefaultAuthServiceProxy(),
+       energyDataService =
+           energyDataService ?? const _DefaultEnergyDataServiceProxy();
+
+  final AuthServiceBase authService;
+  final EnergyDataServiceBase energyDataService;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -20,8 +30,6 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   int _selectedIndex = 3;
-  final AuthService _authService = AuthService();
-  final EnergyDataService _energyDataService = EnergyDataService();
 
   bool _isLoadingGamification = true;
   GamificationProfile _gamificationProfile = const GamificationProfile.empty();
@@ -38,7 +46,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadGamificationProfile() async {
     try {
-      final profile = await _energyDataService.fetchGamificationProfile();
+      final profile = await widget.energyDataService.fetchGamificationProfile();
       if (!mounted) return;
       setState(() {
         _gamificationProfile = profile;
@@ -52,7 +60,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadElectricityProfile() async {
     try {
-      final profile = await _energyDataService.fetchElectricityCostProfile();
+      final profile = await widget.energyDataService
+          .fetchElectricityCostProfile();
       if (!mounted) return;
       setState(() {
         _electricityProfile = profile;
@@ -133,7 +142,7 @@ class _ProfilePageState extends State<ProfilePage> {
             _buildOutlineButton(
               'Logout',
               onTap: () async {
-                await _authService.signOut();
+                await widget.authService.signOut();
                 if (!context.mounted) return;
                 Navigator.pushAndRemoveUntil(
                   context,
@@ -765,4 +774,127 @@ class _ProfilePageState extends State<ProfilePage> {
       label: label,
     );
   }
+}
+
+class _DefaultAuthServiceProxy implements AuthServiceBase {
+  const _DefaultAuthServiceProxy();
+
+  AuthService get _service => AuthService();
+
+  @override
+  Future<void> deleteAccountAndData() => _service.deleteAccountAndData();
+
+  @override
+  Future<void> enrollPhoneMfa({
+    required String phoneNumber,
+    required Future<String?> Function() getSmsCode,
+  }) =>
+      _service.enrollPhoneMfa(phoneNumber: phoneNumber, getSmsCode: getSmsCode);
+
+  @override
+  Future<bool> hasEquipmentForCurrentUser() =>
+      _service.hasEquipmentForCurrentUser();
+
+  @override
+  Future<void> resolveSignInWithSmsMfa({
+    required FirebaseAuthMultiFactorException exception,
+    required Future<String?> Function() getSmsCode,
+  }) => _service.resolveSignInWithSmsMfa(
+    exception: exception,
+    getSmsCode: getSmsCode,
+  );
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) =>
+      _service.sendPasswordResetEmail(email: email);
+
+  @override
+  Future<void> signIn({required String email, required String password}) =>
+      _service.signIn(email: email, password: password);
+
+  @override
+  Future<void> signInWithGoogle() => _service.signInWithGoogle();
+
+  @override
+  Future<void> signOut() => _service.signOut();
+
+  @override
+  Future<void> signUp({
+    required String name,
+    required String email,
+    required String password,
+  }) => _service.signUp(name: name, email: email, password: password);
+
+  @override
+  Future<void> updateUserName({required String name}) =>
+      _service.updateUserName(name: name);
+}
+
+class _DefaultEnergyDataServiceProxy implements EnergyDataServiceBase {
+  const _DefaultEnergyDataServiceProxy();
+
+  EnergyDataService get _service => EnergyDataService();
+
+  @override
+  Future<GamificationProfile> addGamificationPoints(int rewardPoints) =>
+      _service.addGamificationPoints(rewardPoints);
+
+  @override
+  Future<ElectricityCostProfile> fetchElectricityCostProfile() =>
+      _service.fetchElectricityCostProfile();
+
+  @override
+  Future<GamificationProfile> fetchGamificationProfile() =>
+      _service.fetchGamificationProfile();
+
+  @override
+  Future<EnergyHistoryData> fetchHistory({
+    required String sensorId,
+    required String measure,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) => _service.fetchHistory(
+    sensorId: sensorId,
+    measure: measure,
+    startDate: startDate,
+    endDate: endDate,
+  );
+
+  @override
+  Future<List<EnergySensorOption>> fetchSensors() => _service.fetchSensors();
+
+  @override
+  Future<List<EnergySensorSettings>> fetchSensorSettings() =>
+      _service.fetchSensorSettings();
+
+  @override
+  Future<void> saveElectricityCostProfile(ElectricityCostProfile profile) =>
+      _service.saveElectricityCostProfile(profile);
+
+  @override
+  Stream<EnergyAlertData> streamAlertData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamAlertData(interval: interval);
+
+  @override
+  Stream<EnergyDashboardData> streamDashboardData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamDashboardData(interval: interval);
+
+  @override
+  Future<void> unpairActiveDeviceAndRequestReset() =>
+      _service.unpairActiveDeviceAndRequestReset();
+
+  @override
+  Future<void> updateSensorSettings(List<EnergySensorSettings> settings) =>
+      _service.updateSensorSettings(settings);
+
+  @override
+  Future<bool> waitForFirstTelemetry({
+    Duration timeout = const Duration(seconds: 75),
+    Duration pollInterval = const Duration(seconds: 5),
+  }) => _service.waitForFirstTelemetry(
+    timeout: timeout,
+    pollInterval: pollInterval,
+  );
 }

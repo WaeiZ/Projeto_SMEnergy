@@ -384,7 +384,45 @@ class GamificationProfile {
   }
 }
 
-class EnergyDataService {
+abstract class EnergyDataServiceBase {
+  Stream<EnergyDashboardData> streamDashboardData({
+    Duration interval = const Duration(seconds: 15),
+  });
+
+  Future<bool> waitForFirstTelemetry({
+    Duration timeout = const Duration(seconds: 75),
+    Duration pollInterval = const Duration(seconds: 5),
+  });
+
+  Future<List<EnergySensorOption>> fetchSensors();
+
+  Future<EnergyHistoryData> fetchHistory({
+    required String sensorId,
+    required String measure,
+    required DateTime startDate,
+    required DateTime endDate,
+  });
+
+  Stream<EnergyAlertData> streamAlertData({
+    Duration interval = const Duration(seconds: 15),
+  });
+
+  Future<GamificationProfile> fetchGamificationProfile();
+
+  Future<GamificationProfile> addGamificationPoints(int rewardPoints);
+
+  Future<ElectricityCostProfile> fetchElectricityCostProfile();
+
+  Future<void> saveElectricityCostProfile(ElectricityCostProfile profile);
+
+  Future<List<EnergySensorSettings>> fetchSensorSettings();
+
+  Future<void> updateSensorSettings(List<EnergySensorSettings> settings);
+
+  Future<void> unpairActiveDeviceAndRequestReset();
+}
+
+class EnergyDataService implements EnergyDataServiceBase {
   EnergyDataService({FirebaseAuth? auth, FirebaseFirestore? db})
     : _auth = auth ?? FirebaseAuth.instance,
       _db = db ?? FirebaseFirestore.instance;
@@ -394,6 +432,7 @@ class EnergyDataService {
 
   static const Duration _defaultPollInterval = Duration(seconds: 15);
 
+  @override
   Future<bool> waitForFirstTelemetry({
     Duration timeout = const Duration(seconds: 75),
     Duration pollInterval = const Duration(seconds: 5),
@@ -438,6 +477,7 @@ class EnergyDataService {
     return false;
   }
 
+  @override
   Stream<EnergyDashboardData> streamDashboardData({
     Duration interval = _defaultPollInterval,
   }) async* {
@@ -471,10 +511,7 @@ class EnergyDataService {
       1.0,
       0.84,
     ];
-    final visibleBucketCount = min(
-      bucketHours.length,
-      (now.hour ~/ 3) + 1,
-    );
+    final visibleBucketCount = min(bucketHours.length, (now.hour ~/ 3) + 1);
     final bucketKwTotals = List<double>.filled(visibleBucketCount, 0);
 
     final sensorDocs = await deviceRef.collection('sensors').get();
@@ -552,10 +589,8 @@ class EnergyDataService {
     sensors.sort((a, b) => a.name.compareTo(b.name));
     final chartPoints = List.generate(
       visibleBucketCount,
-      (i) => EnergyChartPoint(
-        x: bucketHours[i].toDouble(),
-        y: bucketKwTotals[i],
-      ),
+      (i) =>
+          EnergyChartPoint(x: bucketHours[i].toDouble(), y: bucketKwTotals[i]),
     );
     final totalDayKwh = sensors.fold<double>(
       0,
@@ -569,6 +604,7 @@ class EnergyDataService {
     );
   }
 
+  @override
   Future<List<EnergySensorOption>> fetchSensors() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -595,6 +631,7 @@ class EnergyDataService {
     return sensors;
   }
 
+  @override
   Future<ElectricityCostProfile> fetchElectricityCostProfile() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -617,6 +654,7 @@ class EnergyDataService {
     return const ElectricityCostProfile.empty();
   }
 
+  @override
   Future<GamificationProfile> fetchGamificationProfile() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -627,6 +665,7 @@ class EnergyDataService {
     return GamificationProfile(points: _asInt(snapshot.data()?['points']));
   }
 
+  @override
   Future<GamificationProfile> addGamificationPoints(int rewardPoints) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -647,6 +686,7 @@ class EnergyDataService {
     return GamificationProfile(points: updatedPoints);
   }
 
+  @override
   Future<void> saveElectricityCostProfile(
     ElectricityCostProfile profile,
   ) async {
@@ -663,6 +703,7 @@ class EnergyDataService {
     }, SetOptions(merge: true));
   }
 
+  @override
   Future<List<EnergySensorSettings>> fetchSensorSettings() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -693,6 +734,7 @@ class EnergyDataService {
     return sensors;
   }
 
+  @override
   Future<void> updateSensorSettings(List<EnergySensorSettings> updates) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -721,6 +763,7 @@ class EnergyDataService {
     await batch.commit();
   }
 
+  @override
   Future<void> unpairActiveDeviceAndRequestReset() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -769,6 +812,7 @@ class EnergyDataService {
     }
   }
 
+  @override
   Future<EnergyHistoryData> fetchHistory({
     required String sensorId,
     required String measure,
@@ -859,6 +903,7 @@ class EnergyDataService {
     );
   }
 
+  @override
   Stream<EnergyAlertData> streamAlertData({
     Duration interval = _defaultPollInterval,
   }) async* {

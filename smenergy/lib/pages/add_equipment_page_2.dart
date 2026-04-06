@@ -4,7 +4,18 @@ import 'package:smenergy/services/device_provisioning_service.dart';
 import 'package:smenergy/services/wifi_settings_service.dart';
 
 class SetupStepOnePage extends StatefulWidget {
-  const SetupStepOnePage({super.key});
+  const SetupStepOnePage({
+    super.key,
+    WifiSettingsServiceBase? wifiSettingsService,
+    DeviceProvisioningServiceBase? provisioningService,
+  }) : wifiSettingsService =
+           wifiSettingsService ?? const _DefaultWifiSettingsServiceProxy(),
+       provisioningService =
+           provisioningService ??
+           const _DefaultDeviceProvisioningServiceProxy();
+
+  final WifiSettingsServiceBase wifiSettingsService;
+  final DeviceProvisioningServiceBase provisioningService;
 
   @override
   State<SetupStepOnePage> createState() => _SetupStepOnePageState();
@@ -12,10 +23,6 @@ class SetupStepOnePage extends StatefulWidget {
 
 class _SetupStepOnePageState extends State<SetupStepOnePage>
     with WidgetsBindingObserver {
-  final WifiSettingsService _wifiSettingsService = WifiSettingsService();
-  final DeviceProvisioningService _provisioningService =
-      DeviceProvisioningService();
-
   bool _waitingReturnFromSettings = false;
   bool _checkingDevice = false;
   bool _navigated = false;
@@ -41,7 +48,7 @@ class _SetupStepOnePageState extends State<SetupStepOnePage>
   }
 
   Future<void> _openWifiSettings() async {
-    final opened = await _wifiSettingsService.openWifiSettings();
+    final opened = await widget.wifiSettingsService.openWifiSettings();
     if (!mounted) return;
 
     if (!opened) {
@@ -63,7 +70,7 @@ class _SetupStepOnePageState extends State<SetupStepOnePage>
     if (_checkingDevice || _navigated) return;
 
     setState(() => _checkingDevice = true);
-    final reachable = await _provisioningService
+    final reachable = await widget.provisioningService
         .isProvisioningDeviceReachable();
     if (!mounted) return;
 
@@ -240,4 +247,30 @@ class _SetupStepOnePageState extends State<SetupStepOnePage>
       ),
     );
   }
+}
+
+class _DefaultWifiSettingsServiceProxy implements WifiSettingsServiceBase {
+  const _DefaultWifiSettingsServiceProxy();
+
+  WifiSettingsService get _service => WifiSettingsService();
+
+  @override
+  Future<bool> openWifiSettings() => _service.openWifiSettings();
+}
+
+class _DefaultDeviceProvisioningServiceProxy
+    implements DeviceProvisioningServiceBase {
+  const _DefaultDeviceProvisioningServiceProxy();
+
+  DeviceProvisioningService get _service => DeviceProvisioningService();
+
+  @override
+  Future<bool> isProvisioningDeviceReachable() =>
+      _service.isProvisioningDeviceReachable();
+
+  @override
+  Future<DeviceProvisioningResult> provisionDevice({
+    required String ssid,
+    required String password,
+  }) => _service.provisionDevice(ssid: ssid, password: password);
 }

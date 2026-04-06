@@ -4,7 +4,39 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-class AuthService {
+abstract class AuthServiceBase {
+  Future<void> signUp({
+    required String name,
+    required String email,
+    required String password,
+  });
+
+  Future<void> signIn({required String email, required String password});
+
+  Future<void> signInWithGoogle();
+
+  Future<void> sendPasswordResetEmail({required String email});
+
+  Future<void> updateUserName({required String name});
+
+  Future<void> deleteAccountAndData();
+
+  Future<void> enrollPhoneMfa({
+    required String phoneNumber,
+    required Future<String?> Function() getSmsCode,
+  });
+
+  Future<void> resolveSignInWithSmsMfa({
+    required FirebaseAuthMultiFactorException exception,
+    required Future<String?> Function() getSmsCode,
+  });
+
+  Future<void> signOut();
+
+  Future<bool> hasEquipmentForCurrentUser();
+}
+
+class AuthService implements AuthServiceBase {
   AuthService({
     FirebaseAuth? auth,
     FirebaseFirestore? db,
@@ -16,11 +48,9 @@ class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
   final GoogleSignIn _googleSignIn;
-  static const Set<String> _hasEquipmentBypassEmails = {
-    'sergiomica14@gmail.com',
-  };
 
-  Future<UserCredential> signUp({
+  @override
+  Future<void> signUp({
     required String name,
     required String email,
     required String password,
@@ -37,18 +67,15 @@ class AuthService {
 
     await user.updateDisplayName(name);
     await _createUserStructure(uid: user.uid, name: name, email: email);
-
-    return credential;
   }
 
-  Future<UserCredential> signIn({
-    required String email,
-    required String password,
-  }) {
-    return _auth.signInWithEmailAndPassword(email: email, password: password);
+  @override
+  Future<void> signIn({required String email, required String password}) async {
+    await _auth.signInWithEmailAndPassword(email: email, password: password);
   }
 
-  Future<UserCredential> signInWithGoogle() async {
+  @override
+  Future<void> signInWithGoogle() async {
     final googleUser = await _googleSignIn.signIn();
     if (googleUser == null) {
       throw StateError('CANCELLED');
@@ -76,14 +103,14 @@ class AuthService {
       final email = user.email ?? googleUser.email;
       await _createUserStructure(uid: user.uid, name: name, email: email);
     }
-
-    return userCredential;
   }
 
+  @override
   Future<void> sendPasswordResetEmail({required String email}) {
     return _auth.sendPasswordResetEmail(email: email);
   }
 
+  @override
   Future<void> updateUserName({required String name}) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -96,6 +123,7 @@ class AuthService {
     }, SetOptions(merge: true));
   }
 
+  @override
   Future<void> deleteAccountAndData() async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -142,6 +170,7 @@ class AuthService {
     }
   }
 
+  @override
   Future<void> enrollPhoneMfa({
     required String phoneNumber,
     required Future<String?> Function() getSmsCode,
@@ -214,7 +243,8 @@ class AuthService {
     await completer.future;
   }
 
-  Future<UserCredential> resolveSignInWithSmsMfa({
+  @override
+  Future<void> resolveSignInWithSmsMfa({
     required FirebaseAuthMultiFactorException exception,
     required Future<String?> Function() getSmsCode,
   }) async {
@@ -223,18 +253,18 @@ class AuthService {
       throw StateError('Segundo fator não suportado.');
     }
 
-    final completer = Completer<UserCredential>();
+    final completer = Completer<void>();
 
     await _auth.verifyPhoneNumber(
       multiFactorSession: exception.resolver.session,
       multiFactorInfo: hint,
       verificationCompleted: (PhoneAuthCredential credential) async {
         try {
-          final result = await exception.resolver.resolveSignIn(
+          await exception.resolver.resolveSignIn(
             PhoneMultiFactorGenerator.getAssertion(credential),
           );
           if (!completer.isCompleted) {
-            completer.complete(result);
+            completer.complete();
           }
         } catch (e) {
           if (!completer.isCompleted) {
@@ -262,11 +292,11 @@ class AuthService {
         );
 
         try {
-          final result = await exception.resolver.resolveSignIn(
+          await exception.resolver.resolveSignIn(
             PhoneMultiFactorGenerator.getAssertion(credential),
           );
           if (!completer.isCompleted) {
-            completer.complete(result);
+            completer.complete();
           }
         } catch (e) {
           if (!completer.isCompleted) {
@@ -277,24 +307,20 @@ class AuthService {
       codeAutoRetrievalTimeout: (_) {},
     );
 
-    return completer.future;
+    await completer.future;
   }
 
+  @override
   Future<void> signOut() async {
     await _auth.signOut();
     await _googleSignIn.signOut();
   }
 
+  @override
   Future<bool> hasEquipmentForCurrentUser() async {
     final user = _auth.currentUser;
     if (user == null) {
       return false;
-    }
-
-    final normalizedEmail = user.email?.trim().toLowerCase();
-    if (normalizedEmail != null &&
-        _hasEquipmentBypassEmails.contains(normalizedEmail)) {
-      return true;
     }
 
     final devicesSnapshot = await _db

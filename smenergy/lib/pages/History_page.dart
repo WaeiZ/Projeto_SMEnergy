@@ -12,14 +12,17 @@ import 'package:smenergy/services/energy_data_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  const HistoryPage({super.key, EnergyDataServiceBase? energyDataService})
+    : energyDataService =
+          energyDataService ?? const _DefaultEnergyDataServiceProxy();
+
+  final EnergyDataServiceBase energyDataService;
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  final EnergyDataService _energyDataService = EnergyDataService();
   static const String _averageMeasure = 'Média (W)';
   static const String _maximumMeasure = 'Máximo (W)';
   static const String _minimumMeasure = 'Mínimo (W)';
@@ -59,7 +62,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _bootstrap() async {
     try {
-      final sensors = await _energyDataService.fetchSensors();
+      final sensors = await widget.energyDataService.fetchSensors();
       if (!mounted) return;
 
       setState(() {
@@ -93,7 +96,7 @@ class _HistoryPageState extends State<HistoryPage> {
     });
 
     try {
-      final data = await _energyDataService.fetchHistory(
+      final data = await widget.energyDataService.fetchHistory(
         sensorId: _selectedSensorId!,
         measure: _selectedMeasure,
         startDate: _startDate,
@@ -928,4 +931,73 @@ class _HistoryPageState extends State<HistoryPage> {
     final month = date.month.toString().padLeft(2, '0');
     return '$day/$month/${date.year}';
   }
+}
+
+class _DefaultEnergyDataServiceProxy implements EnergyDataServiceBase {
+  const _DefaultEnergyDataServiceProxy();
+
+  EnergyDataService get _service => EnergyDataService();
+
+  @override
+  Future<GamificationProfile> addGamificationPoints(int rewardPoints) =>
+      _service.addGamificationPoints(rewardPoints);
+
+  @override
+  Future<ElectricityCostProfile> fetchElectricityCostProfile() =>
+      _service.fetchElectricityCostProfile();
+
+  @override
+  Future<GamificationProfile> fetchGamificationProfile() =>
+      _service.fetchGamificationProfile();
+
+  @override
+  Future<EnergyHistoryData> fetchHistory({
+    required String sensorId,
+    required String measure,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) => _service.fetchHistory(
+    sensorId: sensorId,
+    measure: measure,
+    startDate: startDate,
+    endDate: endDate,
+  );
+
+  @override
+  Future<List<EnergySensorOption>> fetchSensors() => _service.fetchSensors();
+
+  @override
+  Future<List<EnergySensorSettings>> fetchSensorSettings() =>
+      _service.fetchSensorSettings();
+
+  @override
+  Future<void> saveElectricityCostProfile(ElectricityCostProfile profile) =>
+      _service.saveElectricityCostProfile(profile);
+
+  @override
+  Stream<EnergyAlertData> streamAlertData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamAlertData(interval: interval);
+
+  @override
+  Stream<EnergyDashboardData> streamDashboardData({
+    Duration interval = const Duration(seconds: 15),
+  }) => _service.streamDashboardData(interval: interval);
+
+  @override
+  Future<void> unpairActiveDeviceAndRequestReset() =>
+      _service.unpairActiveDeviceAndRequestReset();
+
+  @override
+  Future<void> updateSensorSettings(List<EnergySensorSettings> settings) =>
+      _service.updateSensorSettings(settings);
+
+  @override
+  Future<bool> waitForFirstTelemetry({
+    Duration timeout = const Duration(seconds: 75),
+    Duration pollInterval = const Duration(seconds: 5),
+  }) => _service.waitForFirstTelemetry(
+    timeout: timeout,
+    pollInterval: pollInterval,
+  );
 }

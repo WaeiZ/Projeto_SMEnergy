@@ -8,14 +8,22 @@ import 'package:smenergy/services/auth_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({
+    super.key,
+    AuthServiceBase? authService,
+    this.dashboardPageBuilder,
+    this.addEquipmentPageBuilder,
+  }) : authService = authService ?? const _DefaultAuthServiceProxy();
+
+  final AuthServiceBase authService;
+  final WidgetBuilder? dashboardPageBuilder;
+  final WidgetBuilder? addEquipmentPageBuilder;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final AuthService _authService = AuthService();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
   bool _isObscure = true;
@@ -43,12 +51,12 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signIn(email: email, password: pass);
+      await widget.authService.signIn(email: email, password: pass);
       if (!mounted) return;
       await _navigateAfterLogin();
     } on FirebaseAuthMultiFactorException catch (e) {
       try {
-        await _authService.resolveSignInWithSmsMfa(
+        await widget.authService.resolveSignInWithSmsMfa(
           exception: e,
           getSmsCode: _promptForSmsCode,
         );
@@ -76,12 +84,12 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signInWithGoogle();
+      await widget.authService.signInWithGoogle();
       if (!mounted) return;
       await _navigateAfterLogin();
     } on FirebaseAuthMultiFactorException catch (e) {
       try {
-        await _authService.resolveSignInWithSmsMfa(
+        await widget.authService.resolveSignInWithSmsMfa(
           exception: e,
           getSmsCode: _promptForSmsCode,
         );
@@ -114,7 +122,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _navigateAfterLogin() async {
     bool hasEquipment = false;
     try {
-      hasEquipment = await _authService.hasEquipmentForCurrentUser();
+      hasEquipment = await widget.authService.hasEquipmentForCurrentUser();
     } catch (_) {
       hasEquipment = false;
     }
@@ -123,8 +131,11 @@ class _LoginPageState extends State<LoginPage> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            hasEquipment ? const DashboardPage() : const AddEquipmentPage(),
+        builder: hasEquipment
+            ? (widget.dashboardPageBuilder ??
+                  (context) => const DashboardPage())
+            : (widget.addEquipmentPageBuilder ??
+                  (context) => const AddEquipmentPage()),
       ),
     );
   }
@@ -141,7 +152,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isResetLoading = true);
 
     try {
-      await _authService.sendPasswordResetEmail(email: email);
+      await widget.authService.sendPasswordResetEmail(email: email);
       _mostrarMensagem(
         'Enviámos um email para redefinir a password',
         isError: false,
@@ -244,18 +255,13 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 14),
-
-              // EMAIL
               CustomPopOutInput(
                 controller: _emailController,
                 icon: Icons.mail_outline,
                 hint: 'Email',
                 gradient: myGradient,
               ),
-
               const SizedBox(height: 22),
-
-              // PASSWORD
               CustomPopOutInput(
                 controller: _passController,
                 icon: Icons.lock_outline,
@@ -269,8 +275,6 @@ class _LoginPageState extends State<LoginPage> {
                   });
                 },
               ),
-
-              // ESQUECEU A PASSWORD
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -283,28 +287,20 @@ class _LoginPageState extends State<LoginPage> {
                   child: const Text(
                     'Esqueceu a sua password?',
                     style: TextStyle(
-                      color: Color(0xFF1D7EF8), // Azul 500
+                      color: Color(0xFF1D7EF8),
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
-              // BOTÃO ENTRAR
               CustomGradientButton(
                 text: _isLoading ? 'A entrar...' : 'Entrar',
                 gradient: myGradient,
-                onPressed: () {
-                  _login();
-                },
+                onPressed: _login,
               ),
-
               const SizedBox(height: 28),
-
-              // DIVISOR
               Row(
                 children: [
                   Expanded(child: Divider(color: Colors.grey[300])),
@@ -318,10 +314,7 @@ class _LoginPageState extends State<LoginPage> {
                   Expanded(child: Divider(color: Colors.grey[300])),
                 ],
               ),
-
               const SizedBox(height: 24),
-
-              // BOTÃO GMAIL
               SizedBox(
                 height: 55,
                 child: OutlinedButton(
@@ -357,8 +350,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 22),
-
-              // RODAPÉ
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -388,4 +379,58 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
+}
+
+class _DefaultAuthServiceProxy implements AuthServiceBase {
+  const _DefaultAuthServiceProxy();
+
+  AuthService get _service => AuthService();
+
+  @override
+  Future<void> deleteAccountAndData() => _service.deleteAccountAndData();
+
+  @override
+  Future<void> enrollPhoneMfa({
+    required String phoneNumber,
+    required Future<String?> Function() getSmsCode,
+  }) =>
+      _service.enrollPhoneMfa(phoneNumber: phoneNumber, getSmsCode: getSmsCode);
+
+  @override
+  Future<bool> hasEquipmentForCurrentUser() =>
+      _service.hasEquipmentForCurrentUser();
+
+  @override
+  Future<void> resolveSignInWithSmsMfa({
+    required FirebaseAuthMultiFactorException exception,
+    required Future<String?> Function() getSmsCode,
+  }) => _service.resolveSignInWithSmsMfa(
+    exception: exception,
+    getSmsCode: getSmsCode,
+  );
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) =>
+      _service.sendPasswordResetEmail(email: email);
+
+  @override
+  Future<void> signIn({required String email, required String password}) =>
+      _service.signIn(email: email, password: password);
+
+  @override
+  Future<void> signInWithGoogle() => _service.signInWithGoogle();
+
+  @override
+  Future<void> signOut() => _service.signOut();
+
+  @override
+  Future<void> signUp({
+    required String name,
+    required String email,
+    required String password,
+  }) => _service.signUp(name: name, email: email, password: password);
+
+  @override
+  Future<void> updateUserName({required String name}) =>
+      _service.updateUserName(name: name);
 }
