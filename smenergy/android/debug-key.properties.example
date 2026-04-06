@@ -1,0 +1,4 @@
+storeFile=keystores/smenergy-debug.jks
+storePassword=replace-with-debug-store-password
+keyAlias=smenergy-debug
+keyPassword=replace-with-debug-key-password

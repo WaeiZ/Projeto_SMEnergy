@@ -1,0 +1,4 @@
+storeFile=keystores/smenergy-release.jks
+storePassword=replace-with-release-store-password
+keyAlias=smenergy-release
+keyPassword=replace-with-release-key-password
