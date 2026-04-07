@@ -26,6 +26,10 @@ abstract class AuthServiceBase {
     required Future<String?> Function() getSmsCode,
   });
 
+  Future<List<MultiFactorInfo>> getEnrolledMfaFactors();
+
+  Future<void> unenrollMfa({required String factorUid});
+
   Future<void> resolveSignInWithSmsMfa({
     required FirebaseAuthMultiFactorException exception,
     required Future<String?> Function() getSmsCode,
@@ -241,6 +245,38 @@ class AuthService implements AuthServiceBase {
     );
 
     await completer.future;
+  }
+
+  @override
+  Future<List<MultiFactorInfo>> getEnrolledMfaFactors() async {
+    await _auth.currentUser?.reload();
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Utilizador nÃ£o autenticado.');
+    }
+    return user.multiFactor.getEnrolledFactors();
+  }
+
+  @override
+  Future<void> unenrollMfa({required String factorUid}) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Utilizador nÃ£o autenticado.');
+    }
+
+    final factors = await user.multiFactor.getEnrolledFactors();
+    MultiFactorInfo? factor;
+    for (final item in factors) {
+      if (item.uid == factorUid) {
+        factor = item;
+        break;
+      }
+    }
+    if (factor == null) {
+      throw StateError('Fator MFA nÃ£o encontrado.');
+    }
+
+    await user.multiFactor.unenroll(factorUid: factor.uid);
   }
 
   @override

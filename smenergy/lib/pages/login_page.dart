@@ -397,6 +397,10 @@ class _DefaultAuthServiceProxy implements AuthServiceBase {
       _service.enrollPhoneMfa(phoneNumber: phoneNumber, getSmsCode: getSmsCode);
 
   @override
+  Future<List<MultiFactorInfo>> getEnrolledMfaFactors() =>
+      _service.getEnrolledMfaFactors();
+
+  @override
   Future<bool> hasEquipmentForCurrentUser() =>
       _service.hasEquipmentForCurrentUser();
 
@@ -433,4 +437,8 @@ class _DefaultAuthServiceProxy implements AuthServiceBase {
   @override
   Future<void> updateUserName({required String name}) =>
       _service.updateUserName(name: name);
+
+  @override
+  Future<void> unenrollMfa({required String factorUid}) =>
+      _service.unenrollMfa(factorUid: factorUid);
 }

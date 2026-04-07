@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:smenergy/pages/History_page.dart';
 import 'package:smenergy/pages/alert_page.dart';
 import 'package:smenergy/pages/change_pass_page.dart';
@@ -24,6 +25,9 @@ class _AccSettPageState extends State<AccSettPage> {
   bool _isMfaLoading = false;
   bool _isDeleteLoading = false;
   bool _isNameLoading = false;
+  bool _isMfaEnabled = false;
+  String? _mfaFactorUid;
+  String? _mfaPhoneLabel;
   String _initialName = '';
   bool _hasNameChanged = false;
 
@@ -36,6 +40,7 @@ class _AccSettPageState extends State<AccSettPage> {
     }
     _initialName = _nameController.text.trim();
     _nameController.addListener(_onNameChanged);
+    _loadMfaState();
   }
 
   @override
@@ -79,6 +84,240 @@ class _AccSettPageState extends State<AccSettPage> {
       },
     );
     return result;
+  }
+
+  Future<String?> _promptForPortuguesePhoneNumber() async {
+    final controller = TextEditingController();
+    String? errorText;
+
+    final result = await showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Numero de telemovel'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'O codigo de pais esta fixo para Portugal.',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7FBFF),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: errorText == null
+                            ? const Color(0xFFD9E9FF)
+                            : Colors.redAccent,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 16,
+                          ),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              right: BorderSide(color: Color(0xFFD9E9FF)),
+                            ),
+                          ),
+                          child: const Text(
+                            '+351',
+                            style: TextStyle(
+                              color: Color(0xFF1D7EF8),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: controller,
+                            autofocus: true,
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(9),
+                            ],
+                            onChanged: (_) {
+                              if (errorText != null) {
+                                setDialogState(() => errorText = null);
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              hintText: '912345678',
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (errorText != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      errorText!,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, null),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final digits = controller.text.trim();
+                    if (digits.length != 9) {
+                      setDialogState(() {
+                        errorText = 'Indica os 9 digitos do telemovel.';
+                      });
+                      return;
+                    }
+
+                    Navigator.pop(dialogContext, '+351$digits');
+                  },
+                  child: const Text('Confirmar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+    return result;
+  }
+
+  String _formatPortuguesePhoneLabel(String? phoneNumber) {
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      return 'Numero nao definido';
+    }
+
+    final digits = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    final nationalDigits = digits.startsWith('351') && digits.length >= 12
+        ? digits.substring(3)
+        : digits;
+
+    if (nationalDigits.length == 9) {
+      return '+351 ${nationalDigits.substring(0, 3)} ${nationalDigits.substring(3, 6)} ${nationalDigits.substring(6)}';
+    }
+
+    return phoneNumber;
+  }
+
+  Widget _buildMfaStatusCard(LinearGradient gradient) {
+    final isEnabled = _isMfaEnabled;
+    final accentColor = isEnabled
+        ? const Color(0xFF1D7EF8)
+        : const Color(0xFF6C86A2);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isEnabled ? const Color(0xFFB9D9FF) : const Color(0xFFDCEBFF),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              gradient: isEnabled ? gradient : null,
+              color: isEnabled ? null : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: isEnabled
+                  ? null
+                  : Border.all(color: const Color(0xFFDCEBFF)),
+            ),
+            child: Icon(
+              isEnabled ? Icons.verified_user_rounded : Icons.shield_outlined,
+              color: isEnabled ? Colors.white : accentColor,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: isEnabled
+                          ? const Color(0xFFCAE2FF)
+                          : const Color(0xFFDCEBFF),
+                    ),
+                  ),
+                  child: Text(
+                    isEnabled ? 'MFA ativo' : 'MFA inativo',
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  isEnabled
+                      ? 'Codigo enviado para ${_formatPortuguesePhoneLabel(_mfaPhoneLabel)}.'
+                      : 'Adiciona um segundo fator para proteger melhor a tua conta.',
+                  style: const TextStyle(
+                    color: Color(0xFF2F3443),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showMessage(String text, {bool isError = true}) {
@@ -185,6 +424,36 @@ class _AccSettPageState extends State<AccSettPage> {
     }
   }
 
+  Future<void> _loadMfaState() async {
+    try {
+      final factors = await _authService.getEnrolledMfaFactors();
+      if (!mounted) return;
+
+      String? factorUid;
+      String? phoneLabel;
+      for (final factor in factors) {
+        if (factor is PhoneMultiFactorInfo) {
+          factorUid = factor.uid;
+          phoneLabel = factor.phoneNumber;
+          break;
+        }
+      }
+
+      setState(() {
+        _isMfaEnabled = factorUid != null;
+        _mfaFactorUid = factorUid;
+        _mfaPhoneLabel = phoneLabel;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isMfaEnabled = false;
+        _mfaFactorUid = null;
+        _mfaPhoneLabel = null;
+      });
+    }
+  }
+
   Future<void> _enableMfa() async {
     if (_isMfaLoading) return;
 
@@ -195,17 +464,12 @@ class _AccSettPageState extends State<AccSettPage> {
       return;
     }
 
-    final factors = await user.multiFactor.getEnrolledFactors();
-    if (factors.isNotEmpty) {
+    if (_isMfaEnabled) {
       _showMessage('MFA ja esta ativo.', isError: false);
       return;
     }
 
-    final phoneNumber = await _promptForInput(
-      title: 'Numero de telemovel',
-      hint: '+351 9xx xxx xxx',
-      keyboardType: TextInputType.phone,
-    );
+    final phoneNumber = await _promptForPortuguesePhoneNumber();
     if (phoneNumber == null) return;
 
     setState(() => _isMfaLoading = true);
@@ -219,6 +483,7 @@ class _AccSettPageState extends State<AccSettPage> {
           keyboardType: TextInputType.number,
         ),
       );
+      await _loadMfaState();
       _showMessage('MFA ativado com sucesso.', isError: false);
       if (user.email != null && !user.emailVerified) {
         _showMessage(
@@ -241,7 +506,35 @@ class _AccSettPageState extends State<AccSettPage> {
     }
   }
 
-  String _mapMfaError(FirebaseAuthException e) {
+  Future<void> _disableMfa() async {
+    if (_isMfaLoading) return;
+
+    final factorUid = _mfaFactorUid;
+    if (factorUid == null) {
+      _showMessage('Nao existe MFA ativo nesta conta.');
+      return;
+    }
+
+    setState(() => _isMfaLoading = true);
+
+    try {
+      await _authService.unenrollMfa(factorUid: factorUid);
+      await _loadMfaState();
+      _showMessage('MFA desativado com sucesso.', isError: false);
+    } on FirebaseAuthException catch (e) {
+      _showMessage(_mapMfaError(e, disabling: true));
+    } on StateError catch (e) {
+      _showMessage(e.message);
+    } catch (_) {
+      _showMessage('Erro ao desativar MFA.');
+    } finally {
+      if (mounted) {
+        setState(() => _isMfaLoading = false);
+      }
+    }
+  }
+
+  String _mapMfaError(FirebaseAuthException e, {bool disabling = false}) {
     switch (e.code) {
       case 'invalid-phone-number':
         return 'Numero de telemovel invalido';
@@ -249,10 +542,25 @@ class _AccSettPageState extends State<AccSettPage> {
         return 'Indica um numero de telemovel';
       case 'too-many-requests':
         return 'Muitos pedidos. Tenta mais tarde.';
+      case 'invalid-verification-code':
+        return 'Codigo SMS invalido.';
+      case 'invalid-verification-id':
+      case 'session-expired':
+        return 'A verificacao expirou. Tenta novamente.';
+      case 'quota-exceeded':
+        return 'Limite de SMS atingido. Tenta mais tarde.';
+      case 'second-factor-already-in-use':
+        return 'Este numero ja esta associado a outro fator.';
       case 'requires-recent-login':
-        return 'Por seguranca, termina sessao e entra novamente para ativar MFA.';
+        return disabling
+            ? 'Por seguranca, termina sessao e entra novamente para desativar MFA.'
+            : 'Por seguranca, termina sessao e entra novamente para ativar MFA.';
+      case 'multi-factor-info-not-found':
+        return 'Nao foi encontrado um fator MFA para esta conta.';
       default:
-        return 'Falha ao ativar MFA. Tenta novamente.';
+        return disabling
+            ? 'Falha ao desativar MFA. Tenta novamente.'
+            : 'Falha ao ativar MFA. Tenta novamente.';
     }
   }
 
@@ -335,10 +643,14 @@ class _AccSettPageState extends State<AccSettPage> {
               const SizedBox(height: 16),
             ],
             CustomGradientButton(
-              text: _isMfaLoading ? 'A ativar MFA...' : 'Ativar MFA',
+              text: _isMfaLoading
+                  ? (_isMfaEnabled ? 'A desativar MFA...' : 'A ativar MFA...')
+                  : (_isMfaEnabled ? 'Desativar MFA' : 'Ativar MFA'),
               gradient: myGradient,
-              onPressed: _enableMfa,
+              onPressed: _isMfaEnabled ? _disableMfa : _enableMfa,
             ),
+            const SizedBox(height: 16),
+            _buildMfaStatusCard(myGradient),
             const SizedBox(height: 16),
             CustomGradientButton(
               text: _isDeleteLoading ? 'A eliminar...' : 'Eliminar Conta',
