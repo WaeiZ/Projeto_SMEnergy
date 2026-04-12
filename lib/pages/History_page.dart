@@ -665,11 +665,17 @@ class _HistoryPageState extends State<HistoryPage> {
     try {
       final sensorName = _selectedSensorName ?? _selectedSensorId!;
       final now = DateTime.now();
+      final seriesAverage = _calculateSeriesAverage(_chartValues);
+      final movingAverageValues = _calculateMovingAverage(_chartValues);
+      final measureUnit = _selectedMeasure == _energyMeasure ? 'kWh' : 'W';
+      final decimals = _selectedMeasure == _energyMeasure ? 2 : 1;
       final rows = List<List<String>>.generate(
         _chartLabels.length,
         (index) => [
           _chartLabels[index],
-          _chartValues[index].toStringAsFixed(1),
+          _chartValues[index].toStringAsFixed(decimals),
+          seriesAverage.toStringAsFixed(decimals),
+          movingAverageValues[index].toStringAsFixed(decimals),
         ],
       );
 
@@ -721,6 +727,16 @@ class _HistoryPageState extends State<HistoryPage> {
                   '${_historyData.averageWatts.toStringAsFixed(1)} W',
                 ),
                 _pdfSummaryRow(
+                  'Média da série exportada',
+                  '${seriesAverage.toStringAsFixed(decimals)} $measureUnit',
+                ),
+                _pdfSummaryRow(
+                  'Média móvel (3 períodos)',
+                  movingAverageValues.isEmpty
+                      ? 'Sem dados'
+                      : '${movingAverageValues.last.toStringAsFixed(decimals)} $measureUnit',
+                ),
+                _pdfSummaryRow(
                   'Máximo',
                   '${_historyData.maxWatts.toStringAsFixed(1)} W',
                 ),
@@ -757,7 +773,12 @@ class _HistoryPageState extends State<HistoryPage> {
               pw.Text('Sem dados disponíveis para o período selecionado.')
             else
               pw.TableHelper.fromTextArray(
-                headers: const ['Data', 'Valor (W)'],
+                headers: [
+                  'Data',
+                  'Valor ($measureUnit)',
+                  'Média ($measureUnit)',
+                  'Média móvel ($measureUnit)',
+                ],
                 data: rows,
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 headerDecoration: pw.BoxDecoration(
@@ -821,6 +842,26 @@ class _HistoryPageState extends State<HistoryPage> {
     final hour = date.hour.toString().padLeft(2, '0');
     final minute = date.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
+  }
+
+  double _calculateSeriesAverage(List<double> values) {
+    if (values.isEmpty) return 0;
+    return values.fold<double>(0, (acc, value) => acc + value) / values.length;
+  }
+
+  List<double> _calculateMovingAverage(
+    List<double> values, {
+    int windowSize = 3,
+  }) {
+    if (values.isEmpty) return const [];
+
+    final averages = <double>[];
+    for (int index = 0; index < values.length; index++) {
+      final start = max(0, index - windowSize + 1);
+      final window = values.sublist(start, index + 1);
+      averages.add(_calculateSeriesAverage(window));
+    }
+    return averages;
   }
 
   void _showSnackBar(String message) {

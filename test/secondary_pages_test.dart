@@ -144,6 +144,28 @@ void main() {
       expect(find.byType(SetupStepOnePage), findsOneWidget);
     });
 
+    testWidgets('AddEquipmentPage volta para login sem ecrã preto', (
+      tester,
+    ) async {
+      final auth = FakeAuthService();
+
+      await tester.pumpWidget(
+        buildTestApp(
+          AddEquipmentPage(
+            authService: auth,
+            loginPageBuilder: (_) =>
+                const Scaffold(body: Text('Login destino')),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+      await tester.pumpAndSettle();
+
+      expect(auth.signOutCalls, 1);
+      expect(find.text('Login destino'), findsOneWidget);
+    });
+
     testWidgets('SetupStepOnePage mostra erro quando nao abre wifi settings', (
       tester,
     ) async {

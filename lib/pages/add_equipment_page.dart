@@ -1,9 +1,32 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:smenergy/pages/login_page.dart';
 import 'package:smenergy/pages/add_equipment_page_2.dart';
+import 'package:smenergy/services/auth_service.dart';
 import 'package:smenergy/widgets/custom_widgets.dart';
 
 class AddEquipmentPage extends StatelessWidget {
-  const AddEquipmentPage({super.key});
+  const AddEquipmentPage({
+    super.key,
+    AuthServiceBase? authService,
+    this.loginPageBuilder,
+  }) : authService = authService ?? const _DefaultAuthServiceProxy();
+
+  final AuthServiceBase authService;
+  final WidgetBuilder? loginPageBuilder;
+
+  Future<void> _goBackToLogin(BuildContext context) async {
+    await authService.signOut();
+    if (!context.mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: loginPageBuilder ?? (context) => const LoginPage(),
+      ),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +43,7 @@ class AddEquipmentPage extends StatelessWidget {
             color: Colors.black,
             size: 20,
           ),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => _goBackToLogin(context),
         ),
       ),
       body: SafeArea(
@@ -93,4 +116,66 @@ class AddEquipmentPage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DefaultAuthServiceProxy implements AuthServiceBase {
+  const _DefaultAuthServiceProxy();
+
+  AuthService get _service => AuthService();
+
+  @override
+  Future<void> deleteAccountAndData() => _service.deleteAccountAndData();
+
+  @override
+  Future<void> enrollPhoneMfa({
+    required String phoneNumber,
+    required Future<String?> Function() getSmsCode,
+  }) =>
+      _service.enrollPhoneMfa(phoneNumber: phoneNumber, getSmsCode: getSmsCode);
+
+  @override
+  Future<List<MultiFactorInfo>> getEnrolledMfaFactors() =>
+      _service.getEnrolledMfaFactors();
+
+  @override
+  Future<bool> hasEquipmentForCurrentUser() =>
+      _service.hasEquipmentForCurrentUser();
+
+  @override
+  Future<void> resolveSignInWithSmsMfa({
+    required FirebaseAuthMultiFactorException exception,
+    required Future<String?> Function() getSmsCode,
+  }) => _service.resolveSignInWithSmsMfa(
+    exception: exception,
+    getSmsCode: getSmsCode,
+  );
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) =>
+      _service.sendPasswordResetEmail(email: email);
+
+  @override
+  Future<void> signIn({required String email, required String password}) =>
+      _service.signIn(email: email, password: password);
+
+  @override
+  Future<void> signInWithGoogle() => _service.signInWithGoogle();
+
+  @override
+  Future<void> signOut() => _service.signOut();
+
+  @override
+  Future<void> signUp({
+    required String name,
+    required String email,
+    required String password,
+  }) => _service.signUp(name: name, email: email, password: password);
+
+  @override
+  Future<void> updateUserName({required String name}) =>
+      _service.updateUserName(name: name);
+
+  @override
+  Future<void> unenrollMfa({required String factorUid}) =>
+      _service.unenrollMfa(factorUid: factorUid);
 }

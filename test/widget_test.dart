@@ -142,6 +142,9 @@ class _FakeAuthService implements AuthServiceBase {
   }) async {}
 
   @override
+  Future<List<MultiFactorInfo>> getEnrolledMfaFactors() async => const [];
+
+  @override
   Future<bool> hasEquipmentForCurrentUser() async => hasEquipment;
 
   @override
@@ -149,6 +152,9 @@ class _FakeAuthService implements AuthServiceBase {
     required FirebaseAuthMultiFactorException exception,
     required Future<String?> Function() getSmsCode,
   }) async {}
+
+  @override
+  Future<void> unenrollMfa({required String factorUid}) async {}
 
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {

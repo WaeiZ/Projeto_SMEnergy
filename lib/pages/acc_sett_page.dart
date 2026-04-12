@@ -86,6 +86,11 @@ class _AccSettPageState extends State<AccSettPage> {
     return result;
   }
 
+  Future<void> _waitForUiToSettle() async {
+    await Future<void>.delayed(Duration.zero);
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
   Future<String?> _promptForPortuguesePhoneNumber() async {
     final controller = TextEditingController();
     String? errorText;
@@ -472,16 +477,23 @@ class _AccSettPageState extends State<AccSettPage> {
     final phoneNumber = await _promptForPortuguesePhoneNumber();
     if (phoneNumber == null) return;
 
+    await _waitForUiToSettle();
+    if (!mounted) return;
+
     setState(() => _isMfaLoading = true);
 
     try {
       await _authService.enrollPhoneMfa(
         phoneNumber: phoneNumber,
-        getSmsCode: () => _promptForInput(
-          title: 'Codigo SMS',
-          hint: 'Ex: 123456',
-          keyboardType: TextInputType.number,
-        ),
+        getSmsCode: () async {
+          await _waitForUiToSettle();
+          if (!mounted) return null;
+          return _promptForInput(
+            title: 'Codigo SMS',
+            hint: 'Ex: 123456',
+            keyboardType: TextInputType.number,
+          );
+        },
       );
       await _loadMfaState();
       _showMessage('MFA ativado com sucesso.', isError: false);
