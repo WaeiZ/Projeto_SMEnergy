@@ -1,5 +1,6 @@
 const admin = require("firebase-admin");
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 
 admin.initializeApp();
 
@@ -7,6 +8,7 @@ const db = admin.firestore();
 const messaging = admin.messaging();
 
 const ALERT_COOLDOWN_MINUTES = 30;
+const OFFLINE_TIMEOUT_MINUTES = 3;
 
 exports.notifyOnExcessConsumption = onDocumentWritten(
   "users/{uid}/devices/{deviceId}/sensors/{sensorId}",
@@ -115,9 +117,146 @@ exports.notifyOnExcessConsumption = onDocumentWritten(
   },
 );
 
+exports.notifyOnDeviceStatusChange = onDocumentWritten(
+  "users/{uid}/devices/{deviceId}",
+  async (event) => {
+    const beforeData = event.data.before.exists ? event.data.before.data() : null;
+    const afterData = event.data.after.exists ? event.data.after.data() : null;
+
+    if (!afterData) {
+      return;
+    }
+
+    const beforeOnline = readOnlineStatus(beforeData);
+    const afterOnline = readOnlineStatus(afterData);
+
+    if (afterOnline === null || beforeOnline === afterOnline) {
+      return;
+    }
+
+    if (beforeOnline === null && afterOnline === false) {
+      return;
+    }
+
+    const uid = event.params.uid;
+    const deviceId = event.params.deviceId;
+    const deviceName = readDeviceName(afterData, deviceId);
+    const tokens = await fetchUserTokens(uid);
+    const statusText = afterOnline ? "ligado" : "desligado";
+    const title = afterOnline ? "Dispositivo ligado" : "Dispositivo desligado";
+    const body = `${deviceName} está ${statusText}.`;
+
+    if (tokens.length) {
+      const message = {
+        tokens,
+        notification: {
+          title,
+          body,
+        },
+        data: {
+          type: "device_status",
+          deviceId,
+          deviceName,
+          isOnline: String(afterOnline),
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channelId: "energy_alerts",
+          },
+        },
+      };
+
+      const response = await messaging.sendEachForMulticast(message);
+      await cleanupInvalidTokens(uid, tokens, response.responses);
+    }
+
+    await event.data.after.ref.set(
+      {
+        last_status_notification_sent_at: admin.firestore.FieldValue.serverTimestamp(),
+        last_status_notification_state: statusText,
+      },
+      {merge: true},
+    );
+
+    await db
+      .collection("users")
+      .doc(uid)
+      .collection("device_status_history")
+      .add({
+        device_id: deviceId,
+        device_name: deviceName,
+        is_online: afterOnline,
+        status: statusText,
+        sent_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+  },
+);
+
+exports.markStaleDevicesOffline = onSchedule(
+  "every 5 minutes",
+  async () => {
+    const cutoffMs = Date.now() - OFFLINE_TIMEOUT_MINUTES * 60 * 1000;
+    const snapshot = await db
+      .collectionGroup("devices")
+      .where("is_online", "==", true)
+      .get();
+
+    const batch = db.batch();
+    let updates = 0;
+
+    snapshot.docs.forEach((doc) => {
+      const lastSeenMs = toMillis(doc.data().last_seen);
+
+      if (!lastSeenMs || lastSeenMs >= cutoffMs) {
+        return;
+      }
+
+      batch.set(
+        doc.ref,
+        {
+          is_online: false,
+          offline_detected_at: admin.firestore.FieldValue.serverTimestamp(),
+          offline_reason: "heartbeat_timeout",
+        },
+        {merge: true},
+      );
+      updates += 1;
+    });
+
+    if (updates > 0) {
+      await batch.commit();
+    }
+  },
+);
+
 function readSensorName(data, fallback) {
   const name = (data.name ?? data.sensor_name ?? "").toString().trim();
   return name || fallback;
+}
+
+function readDeviceName(data, fallback) {
+  const name = (data.name ?? data.device_name ?? "").toString().trim();
+  return name || fallback;
+}
+
+function readOnlineStatus(data) {
+  if (!data || data.is_online === undefined) {
+    return null;
+  }
+  if (typeof data.is_online === "boolean") {
+    return data.is_online;
+  }
+  if (typeof data.is_online === "string") {
+    const normalized = data.is_online.trim().toLowerCase();
+    if (["true", "1", "online", "ligado"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "offline", "desligado"].includes(normalized)) {
+      return false;
+    }
+  }
+  return null;
 }
 
 function readNumber(value, fallback = 0) {
