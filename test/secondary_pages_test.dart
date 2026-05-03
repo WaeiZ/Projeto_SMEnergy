@@ -36,6 +36,8 @@ void main() {
               EnergySensorStatus(sensorName: 'Sensor Sala', isAlert: true),
             ],
             activeAlert: EnergyActiveAlert(
+              challengeId: 'alert_sensor_sala_20260503',
+              sensorId: 'sensor_sala',
               sensorName: 'Sensor Sala',
               title: 'Sensor Sala: Consumo anómalo',
               description:
@@ -59,6 +61,7 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('42'), findsWidgets);
+      expect(find.text('Verificar'), findsNothing);
     });
 
     testWidgets('ProfilePage abre sem crash e faz logout', (tester) async {

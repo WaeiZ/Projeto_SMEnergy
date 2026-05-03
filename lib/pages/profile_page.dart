@@ -848,6 +848,16 @@ class _DefaultEnergyDataServiceProxy implements EnergyDataServiceBase {
       _service.addGamificationPoints(rewardPoints);
 
   @override
+  Future<GamificationRewardResult> completeGamificationChallenge(
+    EnergyActiveAlert alert,
+  ) => _service.completeGamificationChallenge(alert);
+
+  @override
+  Future<List<GamificationChallengeHistory>> fetchGamificationHistory({
+    int limit = 30,
+  }) => _service.fetchGamificationHistory(limit: limit);
+
+  @override
   Future<ElectricityCostProfile> fetchElectricityCostProfile() =>
       _service.fetchElectricityCostProfile();
 

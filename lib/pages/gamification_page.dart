@@ -12,6 +12,180 @@ class GamificationPage extends StatefulWidget {
   State<GamificationPage> createState() => _GamificationPageState();
 }
 
+class GamificationHistoryPage extends StatefulWidget {
+  const GamificationHistoryPage({super.key});
+
+  @override
+  State<GamificationHistoryPage> createState() =>
+      _GamificationHistoryPageState();
+}
+
+class _GamificationHistoryPageState extends State<GamificationHistoryPage> {
+  final EnergyDataService _energyDataService = EnergyDataService();
+  late final Future<List<GamificationChallengeHistory>> _historyFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _historyFuture = _energyDataService.fetchGamificationHistory();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'HistÃ³rico',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+        centerTitle: false,
+      ),
+      body: FutureBuilder<List<GamificationChallengeHistory>>(
+        future: _historyFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final history = snapshot.data ?? const [];
+          if (history.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: _EmptyHistoryCard(),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+            itemCount: history.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              return _HistoryItemCard(item: history[index]);
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EmptyHistoryCard extends StatelessWidget {
+  const _EmptyHistoryCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDCEBFF)),
+      ),
+      child: const Text(
+        'Ainda nÃ£o existem conquistas concluÃ­das.',
+        style: TextStyle(
+          fontSize: 14,
+          color: Color(0xFF6C86A2),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryItemCard extends StatelessWidget {
+  const _HistoryItemCard({required this.item});
+
+  final GamificationChallengeHistory item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDCEBFF)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE6F2FF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.bolt_rounded,
+              color: Color(0xFF1D7EF8),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2F3443),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _subtitle,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6C86A2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '+${item.rewardPoints}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1D7EF8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _subtitle {
+    final date = item.completedAt;
+    final sensor = item.sensorName.isEmpty ? 'Sensor' : item.sensorName;
+    if (date == null) return sensor;
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString().padLeft(4, '0');
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$sensor · $day/$month/$year $hour:$minute';
+  }
+}
+
 class _GamificationPageState extends State<GamificationPage> {
   int _selectedIndex = 3;
   final EnergyDataService _energyDataService = EnergyDataService();
@@ -71,6 +245,8 @@ class _GamificationPageState extends State<GamificationPage> {
                 children: [
                   const SizedBox(height: 8),
                   _buildSummaryCard(),
+                  const SizedBox(height: 12),
+                  _buildHistoryButton(),
                   const SizedBox(height: 20),
                   _buildLevelTimeline(),
                   const SizedBox(height: 24),
@@ -78,6 +254,33 @@ class _GamificationPageState extends State<GamificationPage> {
               ),
       ),
       bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildHistoryButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GamificationHistoryPage(),
+            ),
+          );
+        },
+        icon: const Icon(Icons.history_rounded),
+        label: const Text('Ver histÃ³rico'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF1D7EF8),
+          side: const BorderSide(color: Color(0xFFDCEBFF)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
     );
   }
 

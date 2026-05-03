@@ -66,6 +66,10 @@ class _LoginPageState extends State<LoginPage> {
         if (err.message != 'CANCELLED') {
           _mostrarMensagem(err.message);
         }
+      } on FirebaseAuthException catch (err) {
+        _mostrarMensagem(_mapAuthError(err));
+      } catch (_) {
+        _mostrarMensagem('Não foi possível confirmar o segundo fator.');
       }
     } on FirebaseAuthException catch (e) {
       _mostrarMensagem(_mapAuthError(e));
@@ -99,6 +103,10 @@ class _LoginPageState extends State<LoginPage> {
         if (err.message != 'CANCELLED') {
           _mostrarMensagem(err.message);
         }
+      } on FirebaseAuthException catch (err) {
+        _mostrarMensagem(_mapAuthError(err));
+      } catch (_) {
+        _mostrarMensagem('Não foi possível confirmar o segundo fator.');
       }
     } on FirebaseAuthException catch (e) {
       _mostrarMensagem(_mapAuthError(e));
@@ -219,6 +227,8 @@ class _LoginPageState extends State<LoginPage> {
         return 'Email ou password incorretos';
       case 'user-disabled':
         return 'Conta desativada';
+      case 'app-not-authorized':
+        return 'Esta instalação Android não está autorizada no Firebase. Verifique o package name e os SHA-1/SHA-256 na consola Firebase.';
       default:
         return 'Falha no login. Tente novamente.';
     }

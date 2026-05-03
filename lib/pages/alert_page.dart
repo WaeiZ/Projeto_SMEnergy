@@ -19,6 +19,7 @@ class _AlertPageState extends State<AlertPage> {
   int _selectedIndex = 2;
   late final Stream<EnergyAlertData> _alertStream;
   bool _isApplyingReward = false;
+  final Set<String> _completedAlertIds = <String>{};
 
   @override
   void initState() {
@@ -31,10 +32,35 @@ class _AlertPageState extends State<AlertPage> {
 
     setState(() => _isApplyingReward = true);
     try {
-      final profile = await widget.energyDataService.addGamificationPoints(
-        alert.rewardPoints,
-      );
+      final result = await widget.energyDataService
+          .completeGamificationChallenge(alert);
       if (!mounted) return;
+      final profile = result.profile;
+      if (result.status == GamificationRewardStatus.notResolved) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'O consumo ainda estÃ¡ acima do limite. Reduz o consumo e volta a verificar.',
+            ),
+          ),
+        );
+        return;
+      }
+      if (result.status == GamificationRewardStatus.alreadyCompleted) {
+        setState(() => _completedAlertIds.add(alert.challengeId));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Este alerta jÃ¡ tinha sido concluÃ­do. Total atual: ${profile.points}.',
+            ),
+          ),
+        );
+        return;
+      }
+      if (result.wasAwarded ||
+          result.status == GamificationRewardStatus.alreadyCompleted) {
+        setState(() => _completedAlertIds.add(alert.challengeId));
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -62,6 +88,12 @@ class _AlertPageState extends State<AlertPage> {
       stream: _alertStream,
       builder: (context, snapshot) {
         final data = snapshot.data ?? const EnergyAlertData.empty();
+        final activeAlert = data.activeAlert;
+        final visibleActiveAlert =
+            activeAlert != null &&
+                !_completedAlertIds.contains(activeAlert.challengeId)
+            ? activeAlert
+            : null;
         final alertCount = data.statuses
             .where((status) => status.isAlert)
             .length;
@@ -92,7 +124,7 @@ class _AlertPageState extends State<AlertPage> {
                   totalSensors: data.statuses.length,
                   alertCount: alertCount,
                   okCount: okCount,
-                  hasActiveAlert: data.activeAlert != null,
+                  hasActiveAlert: visibleActiveAlert != null,
                 ),
                 const SizedBox(height: 18),
                 const Text(
@@ -104,8 +136,8 @@ class _AlertPageState extends State<AlertPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                if (data.activeAlert != null)
-                  _buildActiveAlertCard(data.activeAlert!)
+                if (visibleActiveAlert != null)
+                  _buildActiveAlertCard(visibleActiveAlert)
                 else
                   _buildNoActiveAlertCard(),
                 const SizedBox(height: 20),
@@ -658,6 +690,16 @@ class _DefaultEnergyDataServiceProxy implements EnergyDataServiceBase {
   @override
   Future<GamificationProfile> addGamificationPoints(int rewardPoints) =>
       _service.addGamificationPoints(rewardPoints);
+
+  @override
+  Future<GamificationRewardResult> completeGamificationChallenge(
+    EnergyActiveAlert alert,
+  ) => _service.completeGamificationChallenge(alert);
+
+  @override
+  Future<List<GamificationChallengeHistory>> fetchGamificationHistory({
+    int limit = 30,
+  }) => _service.fetchGamificationHistory(limit: limit);
 
   @override
   Future<ElectricityCostProfile> fetchElectricityCostProfile() =>

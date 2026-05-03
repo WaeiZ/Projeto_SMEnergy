@@ -15,19 +15,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "15499243431-39uehp5930tk4gjq93olc3l4l44uq4c4.apps.googleusercontent.com",
+          "client_id": "15499243431-nr4ot9jl0uvingftrkfadisv1ie8lgbe.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.smenergy",
-            "certificate_hash": "0073956339c9d5ed36da0847b14d92f8a5bc8868"
-          }
-        },
-        {
-          "client_id": "15499243431-r69i877ukblr6mof6353e17ih5bb6824.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.smenergy",
-            "certificate_hash": "80592f83c042a354899cca3ec268d871b77fba5c"
+            "certificate_hash": "f29d0e1126af476a013c04aaf99120aebe1ea706"
           }
         },
         {

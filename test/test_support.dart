@@ -158,6 +158,7 @@ class FakeEnergyDataService implements EnergyDataServiceBase {
     this.historyData = const EnergyHistoryData.empty(),
     this.sensors = const [],
     this.gamificationProfile = const GamificationProfile.empty(),
+    this.gamificationHistory = const [],
     this.electricityProfile = const ElectricityCostProfile.empty(),
     this.sensorSettings = const [],
     this.waitForTelemetryResult = true,
@@ -174,6 +175,7 @@ class FakeEnergyDataService implements EnergyDataServiceBase {
   EnergyHistoryData historyData;
   List<EnergySensorOption> sensors;
   GamificationProfile gamificationProfile;
+  List<GamificationChallengeHistory> gamificationHistory;
   ElectricityCostProfile electricityProfile;
   List<EnergySensorSettings> sensorSettings;
   bool waitForTelemetryResult;
@@ -190,6 +192,22 @@ class FakeEnergyDataService implements EnergyDataServiceBase {
     );
     return gamificationProfile;
   }
+
+  @override
+  Future<GamificationRewardResult> completeGamificationChallenge(
+    EnergyActiveAlert alert,
+  ) async {
+    final profile = await addGamificationPoints(alert.rewardPoints);
+    return GamificationRewardResult(
+      profile: profile,
+      status: GamificationRewardStatus.awarded,
+    );
+  }
+
+  @override
+  Future<List<GamificationChallengeHistory>> fetchGamificationHistory({
+    int limit = 30,
+  }) async => gamificationHistory.take(limit).toList(growable: false);
 
   @override
   Future<ElectricityCostProfile> fetchElectricityCostProfile() async =>

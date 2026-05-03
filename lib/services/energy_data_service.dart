@@ -279,12 +279,16 @@ class EnergySensorStatus {
 
 class EnergyActiveAlert {
   const EnergyActiveAlert({
+    required this.challengeId,
+    required this.sensorId,
     required this.sensorName,
     required this.title,
     required this.description,
     required this.rewardPoints,
   });
 
+  final String challengeId;
+  final String sensorId;
   final String sensorName;
   final String title;
   final String description;
@@ -384,6 +388,43 @@ class GamificationProfile {
   }
 }
 
+class GamificationRewardResult {
+  const GamificationRewardResult({required this.profile, required this.status});
+
+  final GamificationProfile profile;
+  final GamificationRewardStatus status;
+
+  bool get wasAwarded => status == GamificationRewardStatus.awarded;
+}
+
+enum GamificationRewardStatus { awarded, alreadyCompleted, notResolved }
+
+class GamificationChallengeHistory {
+  const GamificationChallengeHistory({
+    required this.id,
+    required this.title,
+    required this.sensorName,
+    required this.rewardPoints,
+    required this.completedAt,
+  });
+
+  final String id;
+  final String title;
+  final String sensorName;
+  final int rewardPoints;
+  final DateTime? completedAt;
+}
+
+class _ChallengeCompletionResult {
+  const _ChallengeCompletionResult({
+    required this.points,
+    required this.wasAwarded,
+  });
+
+  final int points;
+  final bool wasAwarded;
+}
+
 abstract class EnergyDataServiceBase {
   Stream<EnergyDashboardData> streamDashboardData({
     Duration interval = const Duration(seconds: 15),
@@ -410,6 +451,14 @@ abstract class EnergyDataServiceBase {
   Future<GamificationProfile> fetchGamificationProfile();
 
   Future<GamificationProfile> addGamificationPoints(int rewardPoints);
+
+  Future<GamificationRewardResult> completeGamificationChallenge(
+    EnergyActiveAlert alert,
+  );
+
+  Future<List<GamificationChallengeHistory>> fetchGamificationHistory({
+    int limit = 30,
+  });
 
   Future<ElectricityCostProfile> fetchElectricityCostProfile();
 
@@ -687,6 +736,97 @@ class EnergyDataService implements EnergyDataServiceBase {
   }
 
   @override
+  Future<GamificationRewardResult> completeGamificationChallenge(
+    EnergyActiveAlert alert,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      throw StateError('Utilizador nÃ£o autenticado.');
+    }
+
+    final isResolved = await _isAlertResolved(uid: uid, alert: alert);
+    if (!isResolved) {
+      final profile = await fetchGamificationProfile();
+      return GamificationRewardResult(
+        profile: profile,
+        status: GamificationRewardStatus.notResolved,
+      );
+    }
+
+    final safeReward = max(0, alert.rewardPoints);
+    final userRef = _db.collection('users').doc(uid);
+    final challengeRef = userRef
+        .collection('completed_challenges')
+        .doc(alert.challengeId);
+
+    final result = await _db.runTransaction<_ChallengeCompletionResult>((
+      transaction,
+    ) async {
+      final userSnapshot = await transaction.get(userRef);
+      final challengeSnapshot = await transaction.get(challengeRef);
+      final currentPoints = _asInt(userSnapshot.data()?['points']);
+
+      if (challengeSnapshot.exists) {
+        return _ChallengeCompletionResult(
+          points: currentPoints,
+          wasAwarded: false,
+        );
+      }
+
+      final nextPoints = currentPoints + safeReward;
+      transaction.set(userRef, {'points': nextPoints}, SetOptions(merge: true));
+      transaction.set(challengeRef, {
+        'challenge_id': alert.challengeId,
+        'sensor_name': alert.sensorName,
+        'title': alert.title,
+        'reward_points': safeReward,
+        'completed_at': FieldValue.serverTimestamp(),
+      });
+
+      return _ChallengeCompletionResult(points: nextPoints, wasAwarded: true);
+    });
+
+    return GamificationRewardResult(
+      profile: GamificationProfile(points: result.points),
+      status: result.wasAwarded
+          ? GamificationRewardStatus.awarded
+          : GamificationRewardStatus.alreadyCompleted,
+    );
+  }
+
+  @override
+  Future<List<GamificationChallengeHistory>> fetchGamificationHistory({
+    int limit = 30,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      return const [];
+    }
+
+    final safeLimit = max(1, limit);
+    final query = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('completed_challenges')
+        .orderBy('completed_at', descending: true)
+        .limit(safeLimit)
+        .get();
+
+    return query.docs
+        .map((doc) {
+          final data = doc.data();
+          return GamificationChallengeHistory(
+            id: doc.id,
+            title: data['title']?.toString() ?? 'Conquista',
+            sensorName: data['sensor_name']?.toString() ?? '',
+            rewardPoints: _asInt(data['reward_points']),
+            completedAt: _asDateTime(data['completed_at']),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  @override
   Future<void> saveElectricityCostProfile(
     ElectricityCostProfile profile,
   ) async {
@@ -908,7 +1048,7 @@ class EnergyDataService implements EnergyDataServiceBase {
     Duration interval = _defaultPollInterval,
   }) async* {
     await for (final dashboard in streamDashboardData(interval: interval)) {
-      yield _buildAlertData(dashboard.sensors);
+      yield await _buildAlertData(dashboard.sensors);
     }
   }
 
@@ -972,7 +1112,11 @@ class EnergyDataService implements EnergyDataServiceBase {
     return '${_formatDayLabel(start)}-${_formatDayLabel(end)}';
   }
 
-  EnergyAlertData _buildAlertData(List<EnergySensorSnapshot> sensors) {
+  Future<EnergyAlertData> _buildAlertData(
+    List<EnergySensorSnapshot> sensors,
+  ) async {
+    await _clearResolvedActiveChallenges(sensors);
+
     final statuses = sensors
         .map(
           (sensor) => EnergySensorStatus(
@@ -995,16 +1139,127 @@ class EnergyDataService implements EnergyDataServiceBase {
     }
 
     final excess = worst.excessWatts.round();
-    return EnergyAlertData(
-      statuses: statuses,
-      activeAlert: EnergyActiveAlert(
-        sensorName: worst.name,
-        title: '${worst.name}: Consumo anómalo',
-        description:
-            '${worst.name} está com $excess W acima do limite configurado.',
-        rewardPoints: 30 + (excess ~/ 10),
-      ),
+    final challengeId = await _resolveActiveAlertChallengeId(worst);
+    final alert = EnergyActiveAlert(
+      challengeId: challengeId,
+      sensorId: worst.id,
+      sensorName: worst.name,
+      title: '${worst.name}: Consumo anómalo',
+      description:
+          '${worst.name} está com $excess W acima do limite configurado.',
+      rewardPoints: 30 + (excess ~/ 10),
     );
+
+    if (await _isChallengeCompleted(alert.challengeId)) {
+      return EnergyAlertData(statuses: statuses, activeAlert: null);
+    }
+
+    return EnergyAlertData(statuses: statuses, activeAlert: alert);
+  }
+
+  Future<String> _resolveActiveAlertChallengeId(
+    EnergySensorSnapshot sensor,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      return _newAlertChallengeId(sensor);
+    }
+
+    final activeRef = _db
+        .collection('users')
+        .doc(uid)
+        .collection('active_challenges')
+        .doc(_safeDocumentId(sensor.id));
+    final snapshot = await activeRef.get();
+    final existing = snapshot.data()?['challenge_id']?.toString();
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+
+    final challengeId = _newAlertChallengeId(sensor);
+    await activeRef.set({
+      'challenge_id': challengeId,
+      'sensor_id': sensor.id,
+      'sensor_name': sensor.name,
+      'started_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    return challengeId;
+  }
+
+  String _newAlertChallengeId(EnergySensorSnapshot sensor) {
+    final date = sensor.lastReadingAt ?? DateTime.now();
+    return 'alert_${_safeDocumentId(sensor.id)}_${date.microsecondsSinceEpoch}';
+  }
+
+  String _safeDocumentId(String value) {
+    final sanitized = value.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    return sanitized.isEmpty ? 'sensor' : sanitized;
+  }
+
+  Future<bool> _isChallengeCompleted(String challengeId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return false;
+
+    final snapshot = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('completed_challenges')
+        .doc(challengeId)
+        .get();
+    return snapshot.exists;
+  }
+
+  Future<void> _clearResolvedActiveChallenges(
+    List<EnergySensorSnapshot> sensors,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final activeRef = _db
+        .collection('users')
+        .doc(uid)
+        .collection('active_challenges');
+    final resolvedSensors = sensors.where((sensor) => !sensor.isAlert);
+    for (final sensor in resolvedSensors) {
+      await activeRef.doc(_safeDocumentId(sensor.id)).delete();
+    }
+  }
+
+  Future<bool> _isAlertResolved({
+    required String uid,
+    required EnergyActiveAlert alert,
+  }) async {
+    final deviceRef = await _resolveActiveDeviceRef(uid);
+    if (deviceRef == null) return false;
+
+    final sensorRef = deviceRef.collection('sensors').doc(alert.sensorId);
+    final sensorSnapshot = await sensorRef.get();
+    if (!sensorSnapshot.exists) return false;
+
+    final data = sensorSnapshot.data() ?? const <String, dynamic>{};
+    final limitWatts = _asDouble(
+      data['limit_watts'] ?? data['limitWatts'],
+      fallback: 600,
+    );
+    final latest = await _fetchLatestReading(sensorRef);
+    final currentWatts =
+        latest?.watts ??
+        _asDouble(
+          data['current_watts'] ?? data['watts'] ?? data['value'],
+          fallback: 0,
+        );
+
+    if (currentWatts > limitWatts) {
+      return false;
+    }
+
+    await _db
+        .collection('users')
+        .doc(uid)
+        .collection('active_challenges')
+        .doc(_safeDocumentId(alert.sensorId))
+        .delete();
+    return true;
   }
 
   Future<DocumentReference<Map<String, dynamic>>?> _resolveActiveDeviceRef(
