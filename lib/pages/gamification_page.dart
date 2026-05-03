@@ -42,7 +42,7 @@ class _GamificationHistoryPageState extends State<GamificationHistoryPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'HistÃ³rico',
+          'Historico',
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -94,7 +94,7 @@ class _EmptyHistoryCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFDCEBFF)),
       ),
       child: const Text(
-        'Ainda nÃ£o existem conquistas concluÃ­das.',
+        'Ainda nao existem conquistas concluidas.',
         style: TextStyle(
           fontSize: 14,
           color: Color(0xFF6C86A2),
@@ -246,7 +246,7 @@ class _GamificationPageState extends State<GamificationPage> {
                   const SizedBox(height: 8),
                   _buildSummaryCard(),
                   const SizedBox(height: 12),
-                  _buildHistoryButton(),
+                  _buildHistoryAction(),
                   const SizedBox(height: 20),
                   _buildLevelTimeline(),
                   const SizedBox(height: 24),
@@ -257,7 +257,7 @@ class _GamificationPageState extends State<GamificationPage> {
     );
   }
 
-  Widget _buildHistoryButton() {
+  Widget buildHistoryButton() {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
@@ -279,6 +279,57 @@ class _GamificationPageState extends State<GamificationPage> {
             borderRadius: BorderRadius.circular(14),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryAction() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GamificationHistoryPage(),
+            ),
+          );
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7FBFF),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFDCEBFF)),
+          ),
+          child: const Row(
+            children: [
+              Icon(
+                Icons.workspace_premium_rounded,
+                color: Color(0xFF1D7EF8),
+                size: 22,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Historico de conquistas',
+                  style: TextStyle(
+                    color: Color(0xFF1D7EF8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF6C86A2),
+                size: 22,
+              ),
+            ],
+          ),
         ),
       ),
     );
