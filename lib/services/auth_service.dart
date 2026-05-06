@@ -368,7 +368,8 @@ class AuthService implements AuthServiceBase {
     for (final doc in devicesSnapshot.docs) {
       final data = doc.data();
       final placeholder = data['placeholder'] == true;
-      if (doc.id != '_meta' && !placeholder) {
+      final unpaired = data['unpaired'] == true;
+      if (doc.id != '_meta' && !placeholder && !unpaired) {
         return true;
       }
     }

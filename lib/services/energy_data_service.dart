@@ -596,7 +596,7 @@ class EnergyDataService implements EnergyDataServiceBase {
           _asDateTime(data['last_reading_at'] ?? data['updated_at']);
       final hasFreshReading =
           lastReadingAt != null &&
-          now.difference(lastReadingAt) <= const Duration(seconds: 90);
+          now.difference(lastReadingAt) <= const Duration(minutes: 5);
       final explicitOnline = data['is_online'];
       final isOnline = explicitOnline == false ? false : hasFreshReading;
 
@@ -918,11 +918,12 @@ class EnergyDataService implements EnergyDataServiceBase {
     await deviceRef.set({
       'command': 'reset',
       'is_online': false,
+      'unpaired': true,
+      'connectivity_status': 'offline',
+      'connectivity_online': 0,
       'unpaired_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-
-    await Future<void>.delayed(const Duration(seconds: 2));
 
     final sensorsRef = deviceRef.collection('sensors');
     final sensorsSnapshot = await sensorsRef.get();
@@ -931,7 +932,6 @@ class EnergyDataService implements EnergyDataServiceBase {
     }
 
     await _deleteCollection(sensorsRef);
-    await deviceRef.delete();
   }
 
   Future<void> _deleteCollection(
@@ -1292,7 +1292,8 @@ class EnergyDataService implements EnergyDataServiceBase {
   bool _isDataDocument(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     final placeholder = data['placeholder'] == true;
-    return doc.id != '_meta' && !placeholder;
+    final unpaired = data['unpaired'] == true;
+    return doc.id != '_meta' && !placeholder && !unpaired;
   }
 
   String _sensorName(Map<String, dynamic> data, {required String fallback}) {
