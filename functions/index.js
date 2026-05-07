@@ -8,7 +8,7 @@ const db = admin.firestore();
 const messaging = admin.messaging();
 
 const ALERT_COOLDOWN_MINUTES = 30;
-const OFFLINE_TIMEOUT_MINUTES = 3;
+const OFFLINE_TIMEOUT_MINUTES = 10;
 
 exports.notifyOnExcessConsumption = onDocumentWritten(
   "users/{uid}/devices/{deviceId}/sensors/{sensorId}",
@@ -17,6 +17,10 @@ exports.notifyOnExcessConsumption = onDocumentWritten(
     const afterData = event.data.after.exists ? event.data.after.data() : null;
 
     if (!afterData) {
+      return;
+    }
+
+    if (afterData.unpaired === true) {
       return;
     }
 
@@ -127,6 +131,10 @@ exports.notifyOnDeviceStatusChange = onDocumentWritten(
       return;
     }
 
+    if (afterData.unpaired === true) {
+      return;
+    }
+
     const beforeOnline = readOnlineStatus(beforeData);
     const afterOnline = readOnlineStatus(afterData);
 
@@ -206,6 +214,10 @@ exports.markStaleDevicesOffline = onSchedule(
     let updates = 0;
 
     snapshot.docs.forEach((doc) => {
+      if (doc.data().unpaired === true) {
+        return;
+      }
+
       const lastSeenMs = toMillis(doc.data().last_seen);
 
       if (!lastSeenMs || lastSeenMs >= cutoffMs) {

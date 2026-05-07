@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 
 class EnergySensorSnapshot {
   const EnergySensorSnapshot({
@@ -480,6 +481,7 @@ class EnergyDataService implements EnergyDataServiceBase {
   final FirebaseFirestore _db;
 
   static const Duration _defaultPollInterval = Duration(seconds: 15);
+  static const Duration _activeChallengeTtl = Duration(minutes: 10);
 
   @override
   Future<bool> waitForFirstTelemetry({
@@ -744,6 +746,22 @@ class EnergyDataService implements EnergyDataServiceBase {
       throw StateError('Utilizador nÃ£o autenticado.');
     }
 
+    final userRef = _db.collection('users').doc(uid);
+    final activeChallengeRef = userRef
+        .collection('active_challenges')
+        .doc(_safeDocumentId(alert.sensorId));
+    final activeChallengeSnapshot = await activeChallengeRef.get();
+    if (!_isActiveChallengeStillValid(activeChallengeSnapshot.data())) {
+      if (activeChallengeSnapshot.exists) {
+        await activeChallengeRef.delete();
+      }
+      final profile = await fetchGamificationProfile();
+      return GamificationRewardResult(
+        profile: profile,
+        status: GamificationRewardStatus.notResolved,
+      );
+    }
+
     final isResolved = await _isAlertResolved(uid: uid, alert: alert);
     if (!isResolved) {
       final profile = await fetchGamificationProfile();
@@ -754,7 +772,6 @@ class EnergyDataService implements EnergyDataServiceBase {
     }
 
     final safeReward = max(0, alert.rewardPoints);
-    final userRef = _db.collection('users').doc(uid);
     final challengeRef = userRef
         .collection('completed_challenges')
         .doc(alert.challengeId);
@@ -767,6 +784,7 @@ class EnergyDataService implements EnergyDataServiceBase {
       final currentPoints = _asInt(userSnapshot.data()?['points']);
 
       if (challengeSnapshot.exists) {
+        transaction.delete(activeChallengeRef);
         return _ChallengeCompletionResult(
           points: currentPoints,
           wasAwarded: false,
@@ -782,6 +800,7 @@ class EnergyDataService implements EnergyDataServiceBase {
         'reward_points': safeReward,
         'completed_at': FieldValue.serverTimestamp(),
       });
+      transaction.delete(activeChallengeRef);
 
       return _ChallengeCompletionResult(points: nextPoints, wasAwarded: true);
     });
@@ -915,23 +934,68 @@ class EnergyDataService implements EnergyDataServiceBase {
       throw StateError('Dispositivo não encontrado.');
     }
 
+    final deviceSnapshot = await deviceRef.get();
+    final localIp = deviceSnapshot.data()?['local_ip']?.toString().trim();
+
     await deviceRef.set({
       'command': 'reset',
       'is_online': false,
       'unpaired': true,
-      'connectivity_status': 'offline',
-      'connectivity_online': 0,
       'unpaired_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    await _requestLocalDeviceReset(localIp);
+    await Future<void>.delayed(const Duration(seconds: 8));
 
     final sensorsRef = deviceRef.collection('sensors');
     final sensorsSnapshot = await sensorsRef.get();
     for (final sensorDoc in sensorsSnapshot.docs) {
       await _deleteCollection(sensorDoc.reference.collection('readings'));
+      await _deleteQuery(
+        _db
+            .collection('users')
+            .doc(uid)
+            .collection('alert_history')
+            .where('sensor_id', isEqualTo: sensorDoc.id),
+      );
     }
 
     await _deleteCollection(sensorsRef);
+    await _deleteCollection(
+      _db.collection('users').doc(uid).collection('active_challenges'),
+    );
+    await _deleteQuery(
+      _db
+          .collection('users')
+          .doc(uid)
+          .collection('device_status_history')
+          .where('device_id', isEqualTo: deviceRef.id),
+    );
+    await deviceRef.set({
+      'command': 'reset',
+      'is_online': false,
+      'unpaired': true,
+      'placeholder': true,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> _requestLocalDeviceReset(String? localIp) async {
+    if (localIp == null || localIp.isEmpty) {
+      return;
+    }
+
+    final uri = Uri.tryParse('http://$localIp/reset');
+    if (uri == null) {
+      return;
+    }
+
+    try {
+      await http.post(uri).timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // The Firestore command remains as fallback when local reset is unreachable.
+    }
   }
 
   Future<void> _deleteCollection(
@@ -940,6 +1004,24 @@ class EnergyDataService implements EnergyDataServiceBase {
   }) async {
     while (true) {
       final snapshot = await collection.limit(batchSize).get();
+      if (snapshot.docs.isEmpty) {
+        break;
+      }
+
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+  }
+
+  Future<void> _deleteQuery(
+    Query<Map<String, dynamic>> query, {
+    int batchSize = 100,
+  }) async {
+    while (true) {
+      final snapshot = await query.limit(batchSize).get();
       if (snapshot.docs.isEmpty) {
         break;
       }
@@ -1115,7 +1197,7 @@ class EnergyDataService implements EnergyDataServiceBase {
   Future<EnergyAlertData> _buildAlertData(
     List<EnergySensorSnapshot> sensors,
   ) async {
-    await _clearResolvedActiveChallenges(sensors);
+    await _clearExpiredActiveChallenges();
 
     final statuses = sensors
         .map(
@@ -1135,7 +1217,8 @@ class EnergyDataService implements EnergyDataServiceBase {
     }
 
     if (worst == null) {
-      return EnergyAlertData(statuses: statuses, activeAlert: null);
+      final verifiableAlert = await _findVerifiableResolvedActiveAlert(sensors);
+      return EnergyAlertData(statuses: statuses, activeAlert: verifiableAlert);
     }
 
     final excess = worst.excessWatts.round();
@@ -1171,16 +1254,33 @@ class EnergyDataService implements EnergyDataServiceBase {
         .collection('active_challenges')
         .doc(_safeDocumentId(sensor.id));
     final snapshot = await activeRef.get();
-    final existing = snapshot.data()?['challenge_id']?.toString();
-    if (existing != null && existing.isNotEmpty) {
-      return existing;
+    final data = snapshot.data();
+    if (snapshot.exists && !_isActiveChallengeStillValid(data)) {
+      await activeRef.delete();
+    } else {
+      final existing = data?['challenge_id']?.toString();
+      if (existing != null && existing.isNotEmpty) {
+        if (data?['expires_at'] != null || data?['resolved_at'] != null) {
+          await activeRef.set({
+            'expires_at': FieldValue.delete(),
+            'resolved_at': FieldValue.delete(),
+          }, SetOptions(merge: true));
+        }
+        return existing;
+      }
     }
 
     final challengeId = _newAlertChallengeId(sensor);
+    final excess = sensor.excessWatts.round();
+    final rewardPoints = 30 + (excess ~/ 10);
     await activeRef.set({
       'challenge_id': challengeId,
       'sensor_id': sensor.id,
       'sensor_name': sensor.name,
+      'title': '${sensor.name}: Consumo anómalo',
+      'description':
+          '${sensor.name} está com $excess W acima do limite configurado.',
+      'reward_points': rewardPoints,
       'started_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
     return challengeId;
@@ -1209,20 +1309,88 @@ class EnergyDataService implements EnergyDataServiceBase {
     return snapshot.exists;
   }
 
-  Future<void> _clearResolvedActiveChallenges(
-    List<EnergySensorSnapshot> sensors,
-  ) async {
+  Future<void> _clearExpiredActiveChallenges() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    final activeRef = _db
+    final snapshot = await _db
         .collection('users')
         .doc(uid)
-        .collection('active_challenges');
-    final resolvedSensors = sensors.where((sensor) => !sensor.isAlert);
-    for (final sensor in resolvedSensors) {
-      await activeRef.doc(_safeDocumentId(sensor.id)).delete();
+        .collection('active_challenges')
+        .get();
+    for (final doc in snapshot.docs) {
+      if (!_isActiveChallengeStillValid(doc.data())) {
+        await doc.reference.delete();
+      }
     }
+  }
+
+  Future<EnergyActiveAlert?> _findVerifiableResolvedActiveAlert(
+    List<EnergySensorSnapshot> sensors,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return null;
+
+    final sensorsById = {
+      for (final sensor in sensors) _safeDocumentId(sensor.id): sensor,
+    };
+    final snapshot = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('active_challenges')
+        .get();
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      if (!_isActiveChallengeStillValid(data)) {
+        await doc.reference.delete();
+        continue;
+      }
+
+      final sensor = sensorsById[doc.id];
+      if (sensor == null || sensor.isAlert) {
+        continue;
+      }
+
+      final expiresAt = _asDateTime(data['expires_at']);
+      if (expiresAt == null) {
+        await doc.reference.set({
+          'resolved_at': FieldValue.serverTimestamp(),
+          'expires_at': Timestamp.fromDate(
+            DateTime.now().add(_activeChallengeTtl),
+          ),
+        }, SetOptions(merge: true));
+      }
+
+      final challengeId = data['challenge_id']?.toString();
+      if (challengeId == null ||
+          challengeId.isEmpty ||
+          await _isChallengeCompleted(challengeId)) {
+        continue;
+      }
+
+      return EnergyActiveAlert(
+        challengeId: challengeId,
+        sensorId: sensor.id,
+        sensorName: sensor.name,
+        title: data['title']?.toString() ?? '${sensor.name}: Consumo reduzido',
+        description:
+            'O consumo de ${sensor.name} ja baixou. Verifica para concluir o desafio.',
+        rewardPoints: _asInt(data['reward_points'], fallback: 30),
+      );
+    }
+
+    return null;
+  }
+
+  bool _isActiveChallengeStillValid(Map<String, dynamic>? data) {
+    if (data == null) return false;
+    final expiresAt = _asDateTime(data['expires_at']);
+    if (expiresAt != null) {
+      return DateTime.now().isBefore(expiresAt);
+    }
+
+    return true;
   }
 
   Future<bool> _isAlertResolved({
@@ -1253,12 +1421,6 @@ class EnergyDataService implements EnergyDataServiceBase {
       return false;
     }
 
-    await _db
-        .collection('users')
-        .doc(uid)
-        .collection('active_challenges')
-        .doc(_safeDocumentId(alert.sensorId))
-        .delete();
     return true;
   }
 

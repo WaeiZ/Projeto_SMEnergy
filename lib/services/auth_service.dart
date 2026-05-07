@@ -75,7 +75,16 @@ class AuthService implements AuthServiceBase {
 
   @override
   Future<void> signIn({required String email, required String password}) async {
-    await _auth.signInWithEmailAndPassword(email: email, password: password);
+    final credential = await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    final user = credential.user;
+    if (user == null) {
+      throw StateError('Falha ao autenticar o utilizador.');
+    }
+
+    await _ensureUserStructure(user: user, fallbackEmail: email);
   }
 
   @override
@@ -97,16 +106,11 @@ class AuthService implements AuthServiceBase {
       throw StateError('Falha ao autenticar com Google.');
     }
 
-    final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
-    if (isNewUser) {
-      final name = user.displayName?.trim().isNotEmpty == true
-          ? user.displayName!.trim()
-          : (googleUser.displayName?.trim().isNotEmpty == true
-                ? googleUser.displayName!.trim()
-                : 'Utilizador');
-      final email = user.email ?? googleUser.email;
-      await _createUserStructure(uid: user.uid, name: name, email: email);
-    }
+    await _ensureUserStructure(
+      user: user,
+      fallbackName: googleUser.displayName,
+      fallbackEmail: googleUser.email,
+    );
   }
 
   @override
@@ -384,17 +388,16 @@ class AuthService implements AuthServiceBase {
     final now = FieldValue.serverTimestamp();
     final userRef = _db.collection('users').doc(uid);
 
-    final batch = _db.batch();
-
-    batch.set(userRef, {
+    await userRef.set({
       'uid': uid,
       'name': name,
       'email': email,
       'points': 0,
       'created_at': now,
-    });
+    }, SetOptions(merge: true));
 
     // Placeholder docs to materialize nested subcollections in the console.
+    final batch = _db.batch();
     final deviceRef = userRef.collection('devices').doc('_meta');
     final sensorRef = deviceRef.collection('sensors').doc('_meta');
     final readingRef = sensorRef.collection('readings').doc('_meta');
@@ -403,6 +406,37 @@ class AuthService implements AuthServiceBase {
     batch.set(sensorRef, {'created_at': now, 'placeholder': true});
     batch.set(readingRef, {'created_at': now, 'placeholder': true});
 
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (_) {
+      // The user document is the critical part; placeholders are only for console visibility.
+    }
+  }
+
+  Future<void> _ensureUserStructure({
+    required User user,
+    String? fallbackName,
+    String? fallbackEmail,
+  }) async {
+    final userRef = _db.collection('users').doc(user.uid);
+    final snapshot = await userRef.get();
+    if (snapshot.exists) {
+      final data = snapshot.data() ?? const <String, dynamic>{};
+      if (!data.containsKey('points')) {
+        await userRef.set({'points': 0}, SetOptions(merge: true));
+      }
+      return;
+    }
+
+    final name = user.displayName?.trim().isNotEmpty == true
+        ? user.displayName!.trim()
+        : (fallbackName?.trim().isNotEmpty == true
+              ? fallbackName!.trim()
+              : 'Utilizador');
+    final email = user.email?.trim().isNotEmpty == true
+        ? user.email!.trim()
+        : (fallbackEmail?.trim() ?? '');
+
+    await _createUserStructure(uid: user.uid, name: name, email: email);
   }
 }

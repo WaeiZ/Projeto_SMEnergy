@@ -40,7 +40,7 @@ class _AlertPageState extends State<AlertPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'O consumo ainda estÃ¡ acima do limite. Reduz o consumo e volta a verificar.',
+              'O consumo ainda está acima do limite. Reduz o consumo e volta a verificar.',
             ),
           ),
         );
@@ -51,7 +51,7 @@ class _AlertPageState extends State<AlertPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Este alerta jÃ¡ tinha sido concluÃ­do. Total atual: ${profile.points}.',
+              'Este alerta já tinha sido concluido. Total atual: ${profile.points}.',
             ),
           ),
         );

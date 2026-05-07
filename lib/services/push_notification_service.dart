@@ -59,6 +59,19 @@ class PushNotificationService {
       return;
     }
 
+    final userRef = _db.collection('users').doc(user.uid);
+    final snapshot = await userRef.get();
+    final hasPoints = snapshot.data()?.containsKey('points') ?? false;
+    await userRef.set({
+      'uid': user.uid,
+      'name': user.displayName?.trim().isNotEmpty == true
+          ? user.displayName!.trim()
+          : 'Utilizador',
+      'email': user.email ?? '',
+      if (!hasPoints) 'points': 0,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
     final tokenRef = _db
         .collection('users')
         .doc(user.uid)

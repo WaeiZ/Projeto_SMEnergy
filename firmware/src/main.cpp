@@ -39,8 +39,6 @@
 #define PREF_KEY_SSID "wifi_ssid"
 #define PREF_KEY_PASS "wifi_pass"
 #define PREF_KEY_UID "owner_uid"
-#define PREF_KEY_RESET_VERSION "reset_ver"
-#define PROVISIONING_RESET_VERSION 2
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
@@ -50,6 +48,7 @@ PZEM004Tv30 pzem2(Serial2, 16, 17, 0x02);
 PZEM004Tv30 pzem3(Serial2, 16, 17, 0x03);
 
 FirebaseData fbdo;
+FirebaseData fbdoWrite;
 FirebaseAuth auth;
 FirebaseConfig config;
 
@@ -68,7 +67,6 @@ bool provisioningPending = false;
 bool serverStarted = false;
 bool provisioningApActive = false;
 bool firebaseInitialized = false;
-bool sensorsInitialized = false;
 
 uint32_t readingCounter = 0;
 unsigned long lastResetCheckMs = 0;
@@ -83,13 +81,12 @@ struct SensorDef {
 };
 
 SensorDef sensors[] = {
-  {&pzem1, "sensor_1", "Sensor 1", 1, false},
-  {&pzem2, "sensor_2", "Sensor 2", 2, false},
-  {&pzem3, "sensor_3", "Sensor 3", 3, false},
+  {&pzem1, "sensor_1", "Sensor 1", 1, true},
+  {&pzem2, "sensor_2", "Sensor 2", 2, true},
+  {&pzem3, "sensor_3", "Sensor 3", 3, true},
 };
 
 const size_t SENSOR_COUNT = sizeof(sensors) / sizeof(sensors[0]);
-size_t activeSensorCount = 0;
 
 String boolToJson(bool value) {
   return value ? "true" : "false";
@@ -174,69 +171,12 @@ void syncClock() {
   }
 }
 
-bool sensorResponding(PZEM004Tv30 *pzem) {
-  for (int attempt = 0; attempt < 3; attempt++) {
-    float voltage = pzem->voltage();
-    float current = pzem->current();
-    float watts = pzem->power();
-
-    if (!isnan(voltage) || !isnan(current) || !isnan(watts)) {
-      return true;
-    }
-
-    delay(200);
-  }
-
-  return false;
-}
-
-void detectConnectedSensors() {
-  activeSensorCount = 0;
-
-  Serial.println("A detetar sensores PZEM...");
-  showOledStatus("SMEnergy", "Detetar sensores");
-  for (size_t i = 0; i < SENSOR_COUNT; i++) {
-    sensors[i].enabled = sensorResponding(sensors[i].pzem);
-    if (sensors[i].enabled) {
-      activeSensorCount++;
-      Serial.print("Sensor ativo detetado: ");
-      Serial.println(sensors[i].id);
-    } else {
-      Serial.print("Sensor ausente/inacessivel: ");
-      Serial.println(sensors[i].id);
-    }
-  }
-
-  Serial.print("Total de sensores ativos: ");
-  Serial.println(activeSensorCount);
-  showOledStatus(
-    "SMEnergy",
-    "Sensores detetados",
-    "Ativos: " + String(activeSensorCount),
-    activeSensorCount == 0 ? "Ligue o sensor" : "Sistema pronto"
-  );
-}
-
 void initSensorsIfNeeded() {
-  if (sensorsInitialized) {
-    return;
-  }
-
   Serial2.begin(9600, SERIAL_8N1, 16, 17);
-  sensorsInitialized = true;
-  detectConnectedSensors();
 }
 
 void loadProvisioning() {
   prefs.begin(PREF_NAMESPACE, false);
-
-  uint32_t resetVersion = prefs.getUInt(PREF_KEY_RESET_VERSION, 0);
-  if (resetVersion < PROVISIONING_RESET_VERSION) {
-    prefs.remove(PREF_KEY_SSID);
-    prefs.remove(PREF_KEY_PASS);
-    prefs.remove(PREF_KEY_UID);
-    prefs.putUInt(PREF_KEY_RESET_VERSION, PROVISIONING_RESET_VERSION);
-  }
 
   configuredSSID = prefs.getString(PREF_KEY_SSID, "");
   configuredPassword = prefs.getString(PREF_KEY_PASS, "");
@@ -245,6 +185,11 @@ void loadProvisioning() {
   if (ownerUID.length() == 0 && strlen(FIREBASE_OWNER_UID) > 0) {
     ownerUID = FIREBASE_OWNER_UID;
   }
+
+  Serial.print("Provisioning SSID guardado: ");
+  Serial.println(configuredSSID.length() > 0 ? configuredSSID : "(vazio)");
+  Serial.print("Provisioning owner UID: ");
+  Serial.println(ownerUID.length() > 0 ? ownerUID : "(vazio)");
 }
 
 void saveProvisioning(const String &ssid, const String &password, const String &uid) {
@@ -279,6 +224,7 @@ bool connectToWifi(const String &ssid, const String &password) {
   delay(200);
   WiFi.disconnect(true, true);
   delay(200);
+  WiFi.setSleep(false);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid.c_str(), password.c_str());
 
@@ -296,6 +242,76 @@ bool connectToWifi(const String &ssid, const String &password) {
     showOledStatus("SMEnergy", "Falha no Wi-Fi", ssid, "Abrir modo AP");
   }
   return connected;
+}
+
+void restartForProvisioning() {
+  clearProvisioning();
+  showOledStatus("SMEnergy", "Reset recebido", "A reiniciar...");
+  WiFi.disconnect(true, true);
+  delay(300);
+  ESP.restart();
+}
+
+void ensureProvisioningRoutes() {
+  if (serverStarted) {
+    return;
+  }
+
+  provisioningServer.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String payload = "{";
+    payload += "\"device_id\":\"" + deviceID + "\",";
+    payload += "\"ap_ssid\":\"" + String(WIFI_AP_NAME) + "\",";
+    payload += "\"wifi_connected\":" + boolToJson(WiFi.status() == WL_CONNECTED) + ",";
+    payload += "\"owner_uid_configured\":" + boolToJson(ownerUID.length() > 0);
+    payload += "}";
+    request->send(200, "application/json", payload);
+  });
+
+  provisioningServer.on("/provision", HTTP_POST, [](AsyncWebServerRequest *request) {
+    bool hasSsid = request->hasParam("ssid", true);
+    bool hasPassword = request->hasParam("password", true);
+    bool hasOwnerUid = request->hasParam("owner_uid", true);
+
+    if (!hasSsid || !hasPassword || !hasOwnerUid) {
+      request->send(400, "application/json", "{\"error\":\"missing ssid/password/owner_uid\"}");
+      return;
+    }
+
+    String ssid = request->getParam("ssid", true)->value();
+    String password = request->getParam("password", true)->value();
+    String uid = request->getParam("owner_uid", true)->value();
+
+    ssid.trim();
+    uid.trim();
+    if (ssid.length() == 0 || uid.length() == 0) {
+      request->send(400, "application/json", "{\"error\":\"ssid and owner_uid are required\"}");
+      return;
+    }
+
+    pendingSSID = ssid;
+    pendingPassword = password;
+    pendingOwnerUID = uid;
+    provisioningPending = true;
+
+    request->send(202, "application/json", "{\"status\":\"accepted\"}");
+  });
+
+  provisioningServer.on("/reset", HTTP_POST, [](AsyncWebServerRequest *request) {
+    request->send(202, "application/json", "{\"status\":\"resetting\"}");
+    restartForProvisioning();
+  });
+
+  provisioningServer.on("/reset", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(202, "application/json", "{\"status\":\"resetting\"}");
+    restartForProvisioning();
+  });
+
+  provisioningServer.onNotFound([](AsyncWebServerRequest *request) {
+    request->send(404, "application/json", "{\"error\":\"not found\"}");
+  });
+
+  provisioningServer.begin();
+  serverStarted = true;
 }
 
 void setupProvisioningServer() {
@@ -322,53 +338,7 @@ void setupProvisioningServer() {
   Serial.print("AP channel: ");
   Serial.println(WiFi.channel());
 
-  if (!serverStarted) {
-    provisioningServer.on("/status", HTTP_GET, [](AsyncWebServerRequest *request) {
-      String payload = "{";
-      payload += "\"device_id\":\"" + deviceID + "\",";
-      payload += "\"ap_ssid\":\"" + String(WIFI_AP_NAME) + "\",";
-      payload += "\"wifi_connected\":" + boolToJson(WiFi.status() == WL_CONNECTED) + ",";
-      payload += "\"owner_uid_configured\":" + boolToJson(ownerUID.length() > 0);
-      payload += "}";
-      request->send(200, "application/json", payload);
-    });
-
-    provisioningServer.on("/provision", HTTP_POST, [](AsyncWebServerRequest *request) {
-      bool hasSsid = request->hasParam("ssid", true);
-      bool hasPassword = request->hasParam("password", true);
-      bool hasOwnerUid = request->hasParam("owner_uid", true);
-
-      if (!hasSsid || !hasPassword || !hasOwnerUid) {
-        request->send(400, "application/json", "{\"error\":\"missing ssid/password/owner_uid\"}");
-        return;
-      }
-
-      String ssid = request->getParam("ssid", true)->value();
-      String password = request->getParam("password", true)->value();
-      String uid = request->getParam("owner_uid", true)->value();
-
-      ssid.trim();
-      uid.trim();
-      if (ssid.length() == 0 || uid.length() == 0) {
-        request->send(400, "application/json", "{\"error\":\"ssid and owner_uid are required\"}");
-        return;
-      }
-
-      pendingSSID = ssid;
-      pendingPassword = password;
-      pendingOwnerUID = uid;
-      provisioningPending = true;
-
-      request->send(202, "application/json", "{\"status\":\"accepted\"}");
-    });
-
-    provisioningServer.onNotFound([](AsyncWebServerRequest *request) {
-      request->send(404, "application/json", "{\"error\":\"not found\"}");
-    });
-
-    provisioningServer.begin();
-    serverStarted = true;
-  }
+  ensureProvisioningRoutes();
 
   Serial.print("Provisioning AP ativo: ");
   Serial.println(WIFI_AP_NAME);
@@ -387,6 +357,8 @@ void initFirebaseIfNeeded() {
     return;
   }
 
+  Serial.print("Heap antes Firebase: ");
+  Serial.println(ESP.getFreeHeap());
   showOledStatus("SMEnergy", "Ligar Firebase");
 
   config.api_key = FIREBASE_API_KEY;
@@ -400,6 +372,8 @@ void initFirebaseIfNeeded() {
 }
 
 bool waitForFirebaseReady(unsigned long timeoutMs) {
+  initFirebaseIfNeeded();
+
   unsigned long start = millis();
   while (!Firebase.ready() && (millis() - start) < timeoutMs) {
     delay(250);
@@ -410,7 +384,7 @@ bool waitForFirebaseReady(unsigned long timeoutMs) {
 
 bool patchDocument(const String &path, FirebaseJson &content, const char *updateMask) {
   bool ok = Firebase.Firestore.patchDocument(
-    &fbdo,
+    &fbdoWrite,
     FIREBASE_PROJECT_ID,
     FIRESTORE_DB_ID,
     path.c_str(),
@@ -418,24 +392,32 @@ bool patchDocument(const String &path, FirebaseJson &content, const char *update
     updateMask
   );
   if (!ok) {
-    logFirebaseError("patchDocument");
+    Serial.print("[Firebase] patchDocument -> ");
+    Serial.println(fbdoWrite.errorReason());
   }
   return ok;
 }
 
-bool upsertDeviceDoc(const String &timestampIso) {
+bool upsertDeviceDoc(const String &timestampIso, bool clearUnpaired = false) {
   FirebaseJson content;
   content.set("fields/name/stringValue", "SMEnergy " + deviceID);
   content.set("fields/source/stringValue", "esp32_pzem");
   content.set("fields/placeholder/booleanValue", false);
-  content.set("fields/unpaired/booleanValue", false);
   content.set("fields/is_online/booleanValue", true);
+  content.set("fields/local_ip/stringValue", WiFi.localIP().toString());
   content.set("fields/last_seen/timestampValue", timestampIso);
+
+  String updateMask = "name,source,placeholder,is_online,local_ip,last_seen";
+  if (clearUnpaired) {
+    content.set("fields/command/stringValue", "");
+    content.set("fields/unpaired/booleanValue", false);
+    updateMask += ",command,unpaired";
+  }
 
   return patchDocument(
     deviceDocPath(),
     content,
-    "name,source,placeholder,unpaired,is_online,last_seen"
+    updateMask.c_str()
   );
 }
 
@@ -485,7 +467,7 @@ bool addReading(
 
   String docId = String(sensor.id) + "_" + String((uint32_t)Firebase.getCurrentTime()) + "_" + String(readingCounter++);
   bool ok = Firebase.Firestore.createDocument(
-    &fbdo,
+    &fbdoWrite,
     FIREBASE_PROJECT_ID,
     FIRESTORE_DB_ID,
     sensorReadingsCollectionPath(sensor.id).c_str(),
@@ -494,14 +476,19 @@ bool addReading(
     ""
   );
   if (!ok) {
-    logFirebaseError("createDocument(reading)");
+    Serial.print("[Firebase] createDocument(reading) -> ");
+    Serial.println(fbdoWrite.errorReason());
   }
   return ok;
 }
 
-void checkRemoteReset() {
+void checkRemoteReset(bool force = false) {
+  if (!Firebase.ready()) {
+    return;
+  }
+
   unsigned long nowMs = millis();
-  if (nowMs - lastResetCheckMs < RESET_CHECK_INTERVAL_MS) {
+  if (!force && nowMs - lastResetCheckMs < RESET_CHECK_INTERVAL_MS) {
     return;
   }
   lastResetCheckMs = nowMs;
@@ -511,7 +498,7 @@ void checkRemoteReset() {
         FIREBASE_PROJECT_ID,
         FIRESTORE_DB_ID,
         deviceDocPath().c_str(),
-        "command"
+        "command,unpaired"
       )) {
     return;
   }
@@ -519,24 +506,24 @@ void checkRemoteReset() {
   FirebaseJson payload;
   payload.setJsonData(fbdo.payload());
   FirebaseJsonData cmdData;
+  FirebaseJsonData unpairedData;
   payload.get(cmdData, "fields/command/stringValue");
+  payload.get(unpairedData, "fields/unpaired/booleanValue");
 
-  if (!cmdData.success || cmdData.stringValue != "reset") {
+  bool resetRequested = cmdData.success && cmdData.stringValue == "reset";
+  bool unpairedRequested = unpairedData.success && unpairedData.boolValue;
+  if (!resetRequested && !unpairedRequested) {
     return;
   }
 
-  Serial.println("Comando remoto: reset");
+  Serial.println(resetRequested ? "Comando remoto: reset" : "Comando remoto: unpaired");
 
   FirebaseJson clearCmd;
   clearCmd.set("fields/command/stringValue", "");
   clearCmd.set("fields/is_online/booleanValue", false);
-  clearCmd.set("fields/unpaired/booleanValue", true);
-  patchDocument(deviceDocPath(), clearCmd, "command,is_online,unpaired");
+  patchDocument(deviceDocPath(), clearCmd, "command,is_online");
 
-  clearProvisioning();
-  WiFi.disconnect(true, true);
-  delay(300);
-  ESP.restart();
+  restartForProvisioning();
 }
 
 void delayWithRemoteResetCheck(unsigned long delayMs) {
@@ -560,8 +547,8 @@ void processProvisioningRequestIfAny() {
 
   bool connected = connectToWifi(configuredSSID, configuredPassword);
   if (connected) {
+    ensureProvisioningRoutes();
     syncClock();
-    initFirebaseIfNeeded();
     initSensorsIfNeeded();
     Serial.println("Provisioning concluído com sucesso.");
   } else {
@@ -593,13 +580,13 @@ void maintainWiFiConnection() {
   if (!connectToWifi(configuredSSID, configuredPassword)) {
     setupProvisioningServer();
   } else {
+    ensureProvisioningRoutes();
     syncClock();
-    initFirebaseIfNeeded();
     initSensorsIfNeeded();
   }
 }
 
-void readAndPublish(const SensorDef &sensor) {
+bool readAndPublish(const SensorDef &sensor) {
   float voltage = sensor.pzem->voltage();
   float watts = sensor.pzem->power();
   float current = sensor.pzem->current();
@@ -616,7 +603,7 @@ void readAndPublish(const SensorDef &sensor) {
   if (isnan(voltage) || isnan(watts) || isnan(current) || isnan(energy)) {
     display.println("ERRO SENSOR " + String(sensor.id));
     display.display();
-    return;
+    return false;
   }
 
   display.setTextSize(2);
@@ -630,23 +617,29 @@ void readAndPublish(const SensorDef &sensor) {
   display.display();
 
   if (WiFi.status() != WL_CONNECTED || ownerUID.length() == 0) {
-    return;
+    return true;
   }
 
   if (!Firebase.ready()) {
-    if (!waitForFirebaseReady(15000UL)) {
-      return;
+    if (!waitForFirebaseReady(5000UL)) {
+      Serial.println("Firebase indisponivel, leitura local mantida.");
+      return true;
     }
   }
+
+  checkRemoteReset(true);
 
   String timestampIso = nowIsoUtc();
   upsertDeviceDoc(timestampIso);
   upsertSensorDoc(sensor, watts, voltage, current, energy, timestampIso);
   addReading(sensor, watts, voltage, current, energy, timestampIso);
+  return true;
 }
 
 void setup() {
   Serial.begin(115200);
+  Serial.print("Heap inicial: ");
+  Serial.println(ESP.getFreeHeap());
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println("OLED Erro");
@@ -664,8 +657,8 @@ void setup() {
 
   bool connected = connectToWifi(configuredSSID, configuredPassword);
   if (connected) {
+    ensureProvisioningRoutes();
     syncClock();
-    initFirebaseIfNeeded();
     initSensorsIfNeeded();
   } else {
     setupProvisioningServer();
@@ -685,24 +678,21 @@ void loop() {
     checkRemoteReset();
   }
 
-  if (activeSensorCount == 0) {
-    static unsigned long lastDetectMs = 0;
-    unsigned long nowMs = millis();
-    if (nowMs - lastDetectMs >= 5000UL) {
-      lastDetectMs = nowMs;
-      detectConnectedSensors();
-    }
-    delay(250);
-    return;
-  }
-
+  bool allReadingsOk = true;
   for (size_t i = 0; i < SENSOR_COUNT; i++) {
     if (!sensors[i].enabled) {
       continue;
     }
-    readAndPublish(sensors[i]);
-    delayWithRemoteResetCheck(SENSOR_LOOP_DELAY_MS);
+    if (WiFi.status() == WL_CONNECTED && Firebase.ready() && ownerUID.length() > 0) {
+      checkRemoteReset(true);
+    }
+    bool ok = readAndPublish(sensors[i]);
+    if (!ok) {
+      allReadingsOk = false;
+    }
   }
+
+  delayWithRemoteResetCheck(allReadingsOk ? SENSOR_LOOP_DELAY_MS : 2000UL);
 
   if (WiFi.status() == WL_CONNECTED && Firebase.ready() && ownerUID.length() > 0) {
     checkRemoteReset();
