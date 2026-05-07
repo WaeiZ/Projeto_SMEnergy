@@ -8,7 +8,7 @@ SMEnergy é uma solução de monitorização energética composta por uma app Fl
 
 - `lib/`: aplicação mobile Flutter com autenticação Firebase, dashboard, histórico, alertas, perfil e onboarding do equipamento.
 - `firmware/`: firmware PlatformIO para ESP32 com provisioning via access point local e envio de leituras para Firestore.
-- `docs/`: Relatório de Projeto e Video de demonstração.
+- `docs/`: Relatório de Projeto
 
 ## Videos Demonstração
 - `Video de demonstração APP/`: https://www.youtube.com/watch?v=cobi8yiz0zc
