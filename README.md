@@ -12,4 +12,4 @@ SMEnergy é uma solução de monitorização energética composta por uma app Fl
 
 ## Videos Demonstração
 - `Video de demonstração APP/`: https://www.youtube.com/watch?v=cobi8yiz0zc
-- `Video de demonstração Configuração do Equipamento/`: 
+- `Video de demonstração Configuração do Equipamento/`: https://youtu.be/15BBA8nOQNc
