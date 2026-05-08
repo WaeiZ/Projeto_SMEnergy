@@ -69,6 +69,7 @@ AsyncResult aResultRead;
 AsyncResult aResultWrite;
 
 bool firebaseInitialized = false;
+bool firebaseAuthReadyLogged = false;
 
 // ─────────────────────────────────────────────
 // Provisioning / estado global
@@ -275,8 +276,10 @@ void initFirebaseIfNeeded() {
 
   ssl_client1.setInsecure();   // aceita certificados sem validação de CA
   ssl_client2.setInsecure();
-  ssl_client1.setTimeout(SSL_CLIENT_TIMEOUT_MS);
-  ssl_client2.setTimeout(SSL_CLIENT_TIMEOUT_MS);
+  ssl_client1.setHandshakeTimeout(SSL_CLIENT_TIMEOUT_MS / 1000);
+  ssl_client2.setHandshakeTimeout(SSL_CLIENT_TIMEOUT_MS / 1000);
+  ssl_client1.setTimeout(SSL_CLIENT_TIMEOUT_MS / 1000);
+  ssl_client2.setTimeout(SSL_CLIENT_TIMEOUT_MS / 1000);
 
   initializeApp(aClientRead, app, getAuth(user_auth), 120 * 1000);
   app.getApp<Firestore::Documents>(Docs);
@@ -294,7 +297,15 @@ bool waitForAppReady(unsigned long timeoutMs) {
     app.loop();
     delay(100);
   }
-  return app.ready();
+  bool ready = app.ready() && app.getToken().length() > 0;
+  if (ready && !firebaseAuthReadyLogged) {
+    firebaseAuthReadyLogged = true;
+    Serial.print("[Firebase] Autenticado. UID: ");
+    Serial.println(app.getUid());
+    Serial.print("[Firebase] Token recebido, tamanho: ");
+    Serial.println(app.getToken().length());
+  }
+  return ready;
 }
 
 // ─────────────────────────────────────────────
@@ -303,6 +314,30 @@ bool waitForAppReady(unsigned long timeoutMs) {
 
 // Constrói um Document Firestore com os campos fornecidos (via FirebaseJson/object_t)
 // e executa patch síncrono, retornando true em caso de sucesso.
+bool ensureFirebaseAuthReady(unsigned long timeoutMs = 8000UL) {
+  if (waitForAppReady(timeoutMs)) return true;
+
+  Serial.println("[Firebase] App pronto sem token valido. A renovar autenticacao...");
+  firebaseAuthReadyLogged = false;
+  app.authenticate();
+
+  unsigned long start = millis();
+  while (millis() - start < timeoutMs) {
+    resetWatchdog();
+    app.loop();
+    if (app.ready() && app.getToken().length() > 0) {
+      Serial.print("[Firebase] Token renovado, tamanho: ");
+      Serial.println(app.getToken().length());
+      firebaseAuthReadyLogged = true;
+      return true;
+    }
+    delay(100);
+  }
+
+  Serial.println("[Firebase] Sem token; Firestore adiado.");
+  return false;
+}
+
 void logFirestoreFailure(const char *operation, AsyncClientClass &ac, const String &result) {
   consecutiveFirestoreErrors++;
 
@@ -352,6 +387,8 @@ bool firestorePatch(
   Document<Values::Value> &doc,
   const String &updateMask
 ) {
+  if (!ensureFirebaseAuthReady()) return false;
+
   PatchDocumentOptions opts(
     DocumentMask(updateMask.c_str()),  // updateMask
     DocumentMask(""),                  // mask (campos a retornar)
@@ -380,6 +417,8 @@ bool firestoreCommitUpdate(
   Document<Values::Value> &doc,
   const String &updateMask
 ) {
+  if (!ensureFirebaseAuthReady()) return false;
+
   doc.setName(docPath);
   Writes writes(Write(DocumentMask(updateMask.c_str()), doc, Precondition()));
 
@@ -403,6 +442,8 @@ bool firestoreCreate(
   const String &docId,
   Document<Values::Value> &doc
 ) {
+  if (!ensureFirebaseAuthReady()) return false;
+
   String documentPath = collectionPath + "/" + docId;
   String result = Docs.createDocument(
     ac,
@@ -426,6 +467,8 @@ bool firestoreGet(
   const String &fieldMask,
   String       &payloadOut
 ) {
+  if (!ensureFirebaseAuthReady()) return false;
+
   GetDocumentOptions opts(DocumentMask(fieldMask.c_str()));
   payloadOut = Docs.get(
     ac,
