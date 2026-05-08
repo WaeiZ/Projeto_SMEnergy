@@ -31,6 +31,8 @@ class SetupStepTwoPage extends StatefulWidget {
 class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
   bool _isObscure = true;
   bool _isConnecting = false;
+  bool _canContinueAfterProvisioning = false;
+  String? _statusMessage;
   final TextEditingController _ssidController = TextEditingController();
   final TextEditingController _passController = TextEditingController();
   @override
@@ -42,6 +44,21 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
 
   void _showMessage(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _finishSetup() async {
+    await widget.setConfigStatus(1);
+    if (!mounted) return;
+
+    _showMessage('Equipamento ligado com sucesso.');
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder:
+            widget.successPageBuilder ?? (context) => const DashboardPage(),
+      ),
+      (route) => false,
+    );
   }
 
   Future<bool> _confirmPhoneHasInternetAgain() async {
@@ -81,7 +98,11 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
       return;
     }
 
-    setState(() => _isConnecting = true);
+    setState(() {
+      _isConnecting = true;
+      _canContinueAfterProvisioning = false;
+      _statusMessage = 'A enviar configuracao para o equipamento...';
+    });
     try {
       final result = await widget.provisioningService.provisionDevice(
         ssid: ssid,
@@ -90,38 +111,47 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
       if (!mounted) return;
 
       if (!result.success) {
+        setState(() => _statusMessage = null);
         _showMessage(result.message);
         return;
       }
 
+      setState(() {
+        _statusMessage =
+            'Configuracao enviada. O equipamento vai ligar-se a rede da casa.';
+      });
+
       final canCheckFirestore = await _confirmPhoneHasInternetAgain();
-      if (!mounted || !canCheckFirestore) return;
-
-      _showMessage('A aguardar a primeira leitura do equipamento...');
-
-      final telemetryReady = await widget.energyDataService
-          .waitForFirstTelemetry();
       if (!mounted) return;
-
-      if (!telemetryReady) {
-        _showMessage(
-          'O equipamento recebeu a configuracao, mas ainda nao enviou leituras. Confirma o Wi-Fi 2.4 GHz, a alimentacao e tenta novamente dentro de instantes.',
-        );
+      if (!canCheckFirestore) {
+        setState(() {
+          _canContinueAfterProvisioning = true;
+          _statusMessage =
+              'Configuracao enviada. Liga o telemovel a Internet e toca em Continuar.';
+        });
         return;
       }
 
-      await widget.setConfigStatus(1);
+      setState(() {
+        _statusMessage =
+            'A confirmar no Firebase se ja chegaram leituras do equipamento...';
+      });
+
+      final telemetryReady = await widget.energyDataService
+          .waitForFirstTelemetry()
+          .timeout(const Duration(seconds: 90), onTimeout: () => false);
       if (!mounted) return;
 
-      _showMessage('Equipamento ligado com sucesso e a enviar dados.');
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder:
-              widget.successPageBuilder ?? (context) => const DashboardPage(),
-        ),
-        (route) => false,
-      );
+      if (!telemetryReady) {
+        setState(() {
+          _canContinueAfterProvisioning = true;
+          _statusMessage =
+              'O equipamento recebeu a configuracao, mas a app nao conseguiu confirmar as leituras automaticamente. Se ja ves leituras no Firebase ou no dashboard, podes continuar.';
+        });
+        return;
+      }
+
+      await _finishSetup();
     } finally {
       if (mounted) {
         setState(() => _isConnecting = false);
@@ -200,12 +230,45 @@ class _SetupStepTwoPageState extends State<SetupStepTwoPage> {
                 });
               },
             ),
-            const SizedBox(height: 220),
+            const Spacer(),
+            if (_statusMessage != null) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isConnecting) ...[
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: Text(
+                      _statusMessage!,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black87,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+            ],
             CustomGradientButton(
               text: _isConnecting ? 'A conectar...' : 'Conectar',
               gradient: myGradient,
               onPressed: _isConnecting ? null : _connectDevice,
             ),
+            if (_canContinueAfterProvisioning) ...[
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: _isConnecting ? null : _finishSetup,
+                child: const Text('Continuar para o dashboard'),
+              ),
+            ],
             const SizedBox(height: 18),
           ],
         ),

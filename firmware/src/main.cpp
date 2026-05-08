@@ -87,6 +87,7 @@ String pendingOwnerUID;
 bool provisioningPending   = false;
 bool serverStarted         = false;
 bool provisioningApActive  = false;
+bool clearUnpairedOnNextDeviceUpsert = false;
 
 uint32_t readingCounter    = 0;
 unsigned long lastResetCheckMs = 0;
@@ -206,9 +207,9 @@ void resetWatchdog() {
 // ─────────────────────────────────────────────
 void loadProvisioning() {
   prefs.begin(PREF_NAMESPACE, false);
-  configuredSSID     = prefs.getString(PREF_KEY_SSID, "");
-  configuredPassword = prefs.getString(PREF_KEY_PASS, "");
-  ownerUID           = prefs.getString(PREF_KEY_UID,  "");
+  configuredSSID     = prefs.isKey(PREF_KEY_SSID) ? prefs.getString(PREF_KEY_SSID, "") : "";
+  configuredPassword = prefs.isKey(PREF_KEY_PASS) ? prefs.getString(PREF_KEY_PASS, "") : "";
+  ownerUID           = prefs.isKey(PREF_KEY_UID)  ? prefs.getString(PREF_KEY_UID,  "") : "";
   Serial.println("Provisioning SSID: " + (configuredSSID.length() ? configuredSSID : "(vazio)"));
   Serial.println("Provisioning UID:  " + (ownerUID.length()       ? ownerUID       : "(vazio)"));
 }
@@ -647,6 +648,7 @@ void processProvisioningRequestIfAny() {
   saveProvisioning(pendingSSID, pendingPassword, pendingOwnerUID);
   bool connected = connectToWifi(configuredSSID, configuredPassword);
   if (connected) {
+    clearUnpairedOnNextDeviceUpsert = true;
     ensureProvisioningRoutes();
     syncClock();
     initSensorsIfNeeded();
@@ -720,7 +722,10 @@ bool readAndPublish(const SensorDef &sensor) {
   app.loop();  // processar token/auth
 
   String ts = nowIsoUtc();
-  upsertDeviceDoc(ts);
+  bool deviceUpdated = upsertDeviceDoc(ts, clearUnpairedOnNextDeviceUpsert);
+  if (deviceUpdated) {
+    clearUnpairedOnNextDeviceUpsert = false;
+  }
   upsertSensorDoc(sensor, watts, voltage, current, energy, ts);
   addReading(sensor, watts, voltage, current, energy, ts);
   return true;

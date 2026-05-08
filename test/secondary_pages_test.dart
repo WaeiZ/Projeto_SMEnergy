@@ -280,5 +280,51 @@ void main() {
       expect(configuredStatus, 1);
       expect(find.text('Dashboard onboarding'), findsOneWidget);
     });
+
+    testWidgets(
+      'SetupStepTwoPage permite continuar quando telemetria nao confirma',
+      (tester) async {
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.binding.setSurfaceSize(const Size(900, 1200));
+
+        final provisioning = FakeDeviceProvisioningService(
+          result: const DeviceProvisioningResult(
+            success: true,
+            message: 'Configuracao enviada',
+          ),
+        );
+        final energy = FakeEnergyDataService(waitForTelemetryResult: false);
+        int? configuredStatus;
+
+        await tester.pumpWidget(
+          buildTestApp(
+            SetupStepTwoPage(
+              provisioningService: provisioning,
+              energyDataService: energy,
+              setConfigStatus: (status) async => configuredStatus = status,
+              successPageBuilder: (_) =>
+                  const Scaffold(body: Text('Dashboard onboarding')),
+            ),
+          ),
+        );
+
+        await tester.enterText(find.byType(TextFormField).at(0), 'CasaWifi');
+        await tester.enterText(find.byType(TextFormField).at(1), 'Password1!');
+        await tester.ensureVisible(find.text('Conectar'));
+        await tester.tap(find.text('Conectar'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Continuar'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Continuar para o dashboard'), findsOneWidget);
+
+        await tester.tap(find.text('Continuar para o dashboard'));
+        await tester.pumpAndSettle();
+
+        expect(configuredStatus, 1);
+        expect(find.text('Dashboard onboarding'), findsOneWidget);
+      },
+    );
   });
 }
