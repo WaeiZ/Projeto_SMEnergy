@@ -13,3 +13,9 @@ SMEnergy é uma solução de monitorização energética composta por uma app Fl
 ## Videos Demonstração
 - `Video de demonstração APP`: https://www.youtube.com/watch?v=cobi8yiz0zc
 - `Video de demonstração Configuração do Equipamento`: https://youtu.be/15BBA8nOQNc
+
+## Nota de Segurança
+
+Este repositório inclui ficheiros de configuração Firebase e credenciais de desenvolvimento utilizadas apenas para fins de avaliação académica e demonstração.
+
+Num ambiente de produção, credenciais sensíveis devem ser movidas para ficheiros de configuração locais, excluídas do controlo de versões e substituídas por mecanismos de autenticação seguros e regras Firebase devidamente restritas.
