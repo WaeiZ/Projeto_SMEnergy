@@ -18,4 +18,4 @@ SMEnergy é uma solução de monitorização energética composta por uma app Fl
 
 Este repositório inclui ficheiros de configuração Firebase e credenciais de desenvolvimento utilizadas apenas para fins de avaliação académica e demonstração.
 
-Num ambiente de produção, credenciais sensíveis devem ser movidas para ficheiros de configuração locais, excluídas do controlo de versões e substituídas por mecanismos de autenticação seguros e regras Firebase devidamente restritas.
+Num ambiente de produção, credenciais sensíveis devem ser movidas para ficheiros de configuração locais, excluídas do controlo de versões e substituídas por mecanismos de autenticação seguros.
