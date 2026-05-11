@@ -1,4 +1,8 @@
-# <img src="Logo_-_Michael_NB.PNG" alt="SMEnergy Logo" width="60" style="vertical-align:middle"/> SMEnergy — Sistema Inteligente de Gestão de Energia Doméstica
+<p align="center">
+  <img src="https://raw.githubusercontent.com/WaeiZ/Projeto_SMEnergy/main/assets/logo.png" alt="SMEnergy Logo" width="180"/>
+</p>
+
+## SMEnergy — Sistema Inteligente de Gestão de Energia Doméstica
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart&logoColor=white)
