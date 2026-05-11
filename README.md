@@ -21,6 +21,7 @@
 | Vídeo de demonstração da App | [YouTube](https://www.youtube.com/watch?v=cobi8yiz0zc) |
 | Vídeo de demonstração da configuração do Equipamento | [YouTube](https://youtu.be/15BBA8nOQNc) |
 
+---
 ## Sobre o Projeto
 
 O **SMEnergy** é um sistema inteligente de monitorização e gestão de energia doméstica. Combina um equipamento IoT baseado em ESP32 com uma aplicação móvel Flutter para oferecer ao utilizador uma visão clara e em tempo real do seu consumo energético.
