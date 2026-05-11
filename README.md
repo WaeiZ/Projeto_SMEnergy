@@ -12,11 +12,13 @@
 
 ---
 
-## Vídeos de Demonstração
+## Documentos do Projeto
 
-- [Demonstração da Aplicação Móvel](https://www.youtube.com/watch?v=cobi8yiz0zc)
-- [Demonstração da Configuração do Equipamento](https://youtu.be/15BBA8nOQNc)
-
+| Ficheiro | Localização |
+|---|---|
+| Relatório final (PDF) | [`docs/Doc_Projeto2_Final.pdf`](docs/Doc_Projeto2_Final.pdf) |
+| Vídeo de demonstração da App | [YouTube](https://www.youtube.com/watch?v=cobi8yiz0zc) |
+| Vídeo de demonstração do Equipamento | [YouTube](https://youtu.be/15BBA8nOQNc) |
 ---
 
 ## Sobre o Projeto
