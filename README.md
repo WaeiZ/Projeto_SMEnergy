@@ -65,7 +65,7 @@ O sistema é composto por três camadas:
 
 ---
 
-## Funcionalidades
+## Funcionalidades Principais
 
 | Funcionalidade | Descrição |
 |---|---|
