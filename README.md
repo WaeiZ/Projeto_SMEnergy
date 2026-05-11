@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/WaeiZ/Projeto_SMEnergy/main/assets/logo.png" alt="SMEnergy Logo" width="180"/>
-</p>
-
 ## SMEnergy — Sistema Inteligente de Gestão de Energia Doméstica
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)
@@ -9,6 +5,10 @@
 ![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth%20%7C%20FCM-FFCA28?logo=firebase&logoColor=black)
 ![ESP32](https://img.shields.io/badge/ESP32-Arduino%20Framework-E7352C?logo=espressif&logoColor=white)
 ![PlatformIO](https://img.shields.io/badge/PlatformIO-Firmware-F5822A?logo=platformio&logoColor=white)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/WaeiZ/Projeto_SMEnergy/main/assets/logo.png" alt="SMEnergy Logo" width="180"/>
+</p>
 
 > Projeto Final de Licenciatura em Engenharia Informática  
 > Universidade Lusófona — Centro Universitário do Porto (CUP)  
