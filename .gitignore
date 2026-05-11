@@ -59,7 +59,6 @@ app.*.symbols
 app.*.map.json
 
 # Build outputs / distributable binaries
-*.apk
 *.aab
 
 # Android Studio will place build artifacts here
