@@ -19,7 +19,7 @@
 | Relatório final (PDF) | [`Relatório Final`](docs/Doc_Projeto2_Final.pdf) |
 | APK (Android) | [`APK`](docs/app-release.apk) |
 | Vídeo de demonstração da App | [YouTube](https://www.youtube.com/watch?v=cobi8yiz0zc) |
-| Vídeo de demonstração do Equipamento | [YouTube](https://youtu.be/15BBA8nOQNc) |
+| Vídeo de demonstração da configuração do Equipamento | [YouTube](https://youtu.be/15BBA8nOQNc) |
 
 ## Sobre o Projeto
 
