@@ -1,4 +1,4 @@
-# SMEnergy — Sistema Inteligente de Gestão de Energia Doméstica
+# <img src="Logo_-_Michael_NB.PNG" alt="SMEnergy Logo" width="60" style="vertical-align:middle"/> SMEnergy — Sistema Inteligente de Gestão de Energia Doméstica
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart&logoColor=white)
