@@ -12,6 +12,13 @@
 
 ---
 
+## Vídeos de Demonstração
+
+- [Demonstração da Aplicação Móvel](https://www.youtube.com/watch?v=cobi8yiz0zc)
+- [Demonstração da Configuração do Equipamento](https://youtu.be/15BBA8nOQNc)
+
+---
+
 ## Sobre o Projeto
 
 O **SMEnergy** é um sistema inteligente de monitorização e gestão de energia doméstica. Combina um equipamento IoT baseado em ESP32 com uma aplicação móvel Flutter para oferecer ao utilizador uma visão clara e em tempo real do seu consumo energético.
@@ -166,15 +173,6 @@ pio run --target upload
 ```
 
 Após o upload, o ESP32 cria um access point local. Usa a app para configurar a ligação Wi-Fi e associar o dispositivo à tua conta.
-
----
-
-## Vídeos de Demonstração
-
-- [Demonstração da Aplicação Móvel](https://www.youtube.com/watch?v=cobi8yiz0zc)
-- [Demonstração da Configuração do Equipamento](https://youtu.be/15BBA8nOQNc)
-
----
 
 ## Autor
 
