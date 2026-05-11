@@ -14,7 +14,7 @@
 
 ## Sobre o Projeto
 
-O **SMEnergy** é um sistema inteligente de monitorização e gestão de energia doméstica. Combina um equipamento IoT baseado em ESP32 com uma aplicação móvel Flutter para oferecer ao utilizador uma visão clara e em tempo quase real do seu consumo energético.
+O **SMEnergy** é um sistema inteligente de monitorização e gestão de energia doméstica. Combina um equipamento IoT baseado em ESP32 com uma aplicação móvel Flutter para oferecer ao utilizador uma visão clara e em tempo real do seu consumo energético.
 
 O problema central que este projeto resolve é a ausência de ferramentas intuitivas e acessíveis que permitam às famílias monitorizar o consumo elétrico doméstico, identificar desperdícios e receber recomendações personalizadas — tudo a um custo muito inferior às alternativas comerciais existentes.
 
