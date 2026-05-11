@@ -16,7 +16,7 @@
 
 | Ficheiro | Localização |
 |---|---|
-| Relatório final (PDF) | [`docs/Doc_Projeto2_Final.pdf`](docs/Doc_Projeto2_Final.pdf) |
+| Relatório final (PDF) | [`Doc_Projeto_Final.pdf`](docs/Doc_Projeto2_Final.pdf) |
 | Vídeo de demonstração da App | [YouTube](https://www.youtube.com/watch?v=cobi8yiz0zc) |
 | Vídeo de demonstração do Equipamento | [YouTube](https://youtu.be/15BBA8nOQNc) |
 ---
