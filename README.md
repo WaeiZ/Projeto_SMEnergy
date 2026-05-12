@@ -1,4 +1,4 @@
-# SMEnergy — Sistema Inteligente de Gestão de Energia Doméstica
+## SMEnergy — Sistema Inteligente de Gestão de Energia Doméstica
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart&logoColor=white)
@@ -6,12 +6,26 @@
 ![ESP32](https://img.shields.io/badge/ESP32-Arduino%20Framework-E7352C?logo=espressif&logoColor=white)
 ![PlatformIO](https://img.shields.io/badge/PlatformIO-Firmware-F5822A?logo=platformio&logoColor=white)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/WaeiZ/Projeto_SMEnergy/main/assets/logo.png" alt="SMEnergy Logo" width="180"/>
+</p>
+
 > Projeto Final de Licenciatura em Engenharia Informática  
 > Universidade Lusófona — Centro Universitário do Porto (CUP)  
 > Ano letivo 2025/2026
 
 ---
 
+## Documentos do Projeto
+
+| Ficheiro | Localização |
+|---|---|
+| Relatório final (PDF) | [`Relatório Final`](docs/Doc_Projeto2_Final.pdf) |
+| APK (Android) | [`APK`](docs/app-release.apk) |
+| Vídeo de demonstração da App | [YouTube](https://www.youtube.com/watch?v=cobi8yiz0zc) |
+| Vídeo de demonstração da configuração do Equipamento | [YouTube](https://youtu.be/15BBA8nOQNc) |
+
+---
 ## Sobre o Projeto
 
 O **SMEnergy** é um sistema inteligente de monitorização e gestão de energia doméstica. Combina um equipamento IoT baseado em ESP32 com uma aplicação móvel Flutter para oferecer ao utilizador uma visão clara e em tempo real do seu consumo energético.
@@ -55,7 +69,7 @@ O sistema é composto por três camadas:
 
 ---
 
-## Funcionalidades
+## Funcionalidades Principais
 
 | Funcionalidade | Descrição |
 |---|---|
@@ -166,15 +180,6 @@ pio run --target upload
 ```
 
 Após o upload, o ESP32 cria um access point local. Usa a app para configurar a ligação Wi-Fi e associar o dispositivo à tua conta.
-
----
-
-## Vídeos de Demonstração
-
-- [Demonstração da Aplicação Móvel](https://www.youtube.com/watch?v=cobi8yiz0zc)
-- [Demonstração da Configuração do Equipamento](https://youtu.be/15BBA8nOQNc)
-
----
 
 ## Autor
 
