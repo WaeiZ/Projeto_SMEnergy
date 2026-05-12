@@ -26,6 +26,8 @@ migrate_working_dir/
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
+.dart-tool/
+.dartServer/
 .dart_tool/
 .flutter-plugins-dependencies
 .pub-cache/
@@ -33,13 +35,35 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Firebase local cache/config
+.firebase-config/
+firebase-debug.log
+
+# Node/Firebase Functions dependencies
+node_modules/
+functions/node_modules/
+
+# Local environment and secrets
+.env
+.env.*
+*.pem
+*.p12
+*.key
+*.cer
+*.crt
+
 # Symbolication related
 app.*.symbols
 
 # Obfuscation related
 app.*.map.json
 
+# Build outputs / distributable binaries
+*.aab
+
 # Android Studio will place build artifacts here
+/android/.gradle/
+/android/local.properties
 /android/app/debug
 /android/app/profile
 /android/app/release
@@ -47,3 +71,8 @@ app.*.map.json
 /android/release-key.properties
 /android/keystores/*.jks
 /android/keystores/*.keystore
+
+# PlatformIO / firmware local build products
+firmware/.pio/
+firmware/.platformio-core/
+firmware/.vscode/
